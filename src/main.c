@@ -1,4 +1,9 @@
+#ifdef __INTELLISENSE__
+#undef __SDCC_mcs51
+#endif
+
 #include <at89x52.h>
+#include <lint.h>
 #include <stdint.h>
 
 #define cbi(sfr, bit) ((sfr) &= ~(1 << (bit)))
@@ -54,4 +59,13 @@ void main() {
         P3_5 = 1;
         msdelay(250);
     }
+}
+
+void timer0(void) __interrupt(1) __using(0) {
+}
+
+void timer1(void) __interrupt(3) __using(0) {
+}
+
+void timer2(void) __interrupt(5) __using(0) {
 }
