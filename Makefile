@@ -10,7 +10,7 @@ OUT = $(BUILD_DIR)/$(TARGET).ihx
 
 # Tools
 SDCC = sdcc
-SDCCFLAGS = --model-small --std-c11
+SDCCFLAGS = --model-small --std-c11 --xram-loc 0x8000 --xram-size 0x2000
 
 # Default target
 all: $(OUT)
