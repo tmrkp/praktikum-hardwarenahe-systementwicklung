@@ -7,9 +7,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define cbi(sfr, bit) ((sfr) &= ~(1 << (bit)))
-#define sbi(sfr, bit) ((sfr) |= (1 << (bit)))
+// PINS for NES controller
+#define NES_CLK P1_2
+#define NES_LATCH P1_0
+#define NES_DATA P1_1
 
+// Button bitmapping for NES controller
 #define BTN_A 0x01
 #define BTN_B 0x02
 #define BTN_SELECT 0x04
@@ -21,7 +24,7 @@
 
 __xdata uint8_t buffer[8192];
 
-__xdata uint8_t* matrix = (__xdata uint8_t*)0x4000;
+__xdata uint8_t* matrix = (__xdata uint8_t*) 0x4000;
 
 uint8_t test_external_ram(uint8_t* ptr, uint16_t size) {
     uint8_t patterns[] = {0x00, 0xFF, 0xAA, 0x55};
@@ -49,24 +52,27 @@ void msdelay(uint16_t value) {
 uint8_t read_controller() {
     uint8_t value = 0;
 
-    P1_2 = 1;
-    P1_0 = 0;
+    NES_CLK   = 0;
+    NES_LATCH = 0;
 
     for (uint8_t i = 0; i < 8; i++) {
-        P1_2 = 0;
-        bool pressed = (P1_1 == 0);
+        NES_CLK = 0;
+
+        bool pressed = (NES_DATA == 0);
         value |= (pressed << i);
-        if (pressed) {
-            matrix[i] = 0b00110000;
-        } else {
-            matrix[i] = 0b0000000;
-        }
-        P1_2 = 1;
+
+        // if (pressed) {
+        //     matrix[i] = 0b00110000;
+        // } else {
+        //     matrix[i] = 0b0000000;
+        // }
+
+        NES_CLK = 1;
     }
 
-    P1_0 = 1;
+    NES_LATCH = 1;
 
-    matrix[8] = 0b00001000;
+    // matrix[8] = 0b00001000;
 
     return value;
 }
@@ -74,15 +80,15 @@ uint8_t read_controller() {
 void main() {
     // timer 0 config
     TMOD = M0_0;
-    TH0 = 0xEF;
-    TL0 = 0xB9;
+    TH0  = 0xEF;  // 2.5ms
+    TL0  = 0xB9;
 
     // interrupt config
-    EA = 1;   // enable interrupts
+    EA  = 1;  // enable interrupts
     ET0 = 1;  // enable timer 0 interrupt
 
-    TR0 = 1;  // enable timer 0
-    P3_5 = 1;
+    TR0  = 1;  // enable timer 0
+    P3_5 = 1;  // disable LED
 
     // matrix1[0] = 0b00110000;
     // matrix1[1] = 0b00110000;
@@ -125,10 +131,9 @@ void main() {
 }
 
 void timer0() __interrupt(TF0_VECTOR) __using(0) {
-    // restart timer0 2.5ms
-    TH0 = 0xEF;
+    TH0 = 0xEF;  // 2.5ms
     TL0 = 0xB9;
-    TR0 = 1;
+    TR0 = 1;  // restart timer 0
 
     P3_5 = !P3_5;
 }
