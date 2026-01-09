@@ -52,13 +52,17 @@ void msdelay(uint16_t value) {
 uint8_t read_controller() {
     uint8_t value = 0;
 
-    NES_CLK   = 0;
+    NES_LATCH = 1;
     NES_LATCH = 0;
 
-    for (uint8_t i = 0; i < 8; i++) {
+    bool pressed = (NES_DATA == 0);
+    value |= pressed;
+
+    for (uint8_t i = 1; i < 8; i++) {
+        NES_CLK = 1;
         NES_CLK = 0;
 
-        bool pressed = (NES_DATA == 0);
+        pressed = (NES_DATA == 0);
         value |= (pressed << i);
 
         // if (pressed) {
@@ -66,11 +70,7 @@ uint8_t read_controller() {
         // } else {
         //     matrix[i] = 0b0000000;
         // }
-
-        NES_CLK = 1;
     }
-
-    NES_LATCH = 1;
 
     // matrix[8] = 0b00001000;
 
@@ -89,6 +89,9 @@ void main() {
 
     TR0  = 1;  // enable timer 0
     P3_5 = 1;  // disable LED
+
+    NES_LATCH = 0;
+    NES_CLK   = 0;
 
     // matrix1[0] = 0b00110000;
     // matrix1[1] = 0b00110000;
