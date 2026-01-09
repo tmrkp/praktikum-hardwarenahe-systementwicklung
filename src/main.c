@@ -22,7 +22,49 @@
 #define BTN_LEFT 0x40
 #define BTN_RIGHT 0x80
 
-__xdata uint8_t buffer[8192];
+#define BLK (0x00)
+#define RED (0x30)
+#define GRN (0x0C)
+#define BLU (0x03)
+
+// Array for external Matrix
+__xdata uint8_t framebuffer[32][16] = {
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, BLU, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {RED, RED, RED, RED, RED, RED, RED, RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, BLU, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, BLU, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+    {GRN, GRN, GRN, GRN, GRN, GRN, GRN, GRN, RED, RED, RED, RED, RED, RED, RED, RED},
+};
+
+// Counter for lines in framebuffer
+uint8_t line_counter = 0;
 
 __xdata uint8_t* matrix = (__xdata uint8_t*) 0x4000;
 
@@ -103,6 +145,8 @@ void main() {
     // matrix1[7] = 0b00110000;
     // matrix1[8] = 0b00001000;
 
+    
+
     while (1) {
         read_controller();
     }
@@ -133,12 +177,34 @@ void main() {
     // }
 }
 
+void frame_translator(uint8_t line) {
+    uint8_t x = 0;
+    uint8_t y = line;
+    for (uint8_t i = 0; i < 8; i++) {
+        matrix[16 * i + 8] = 0;
+        for (uint8_t j = 0; j < 8; j++) {
+            matrix[16 * i + j] = framebuffer[x][y];
+            x++;
+        }
+        matrix[16 * i + 8] = line | 0x08;
+        if (i == 3) {
+            y = y + 8;
+        }
+        x %= 32;
+    }
+}
+
 void timer0() __interrupt(TF0_VECTOR) __using(0) {
     TH0 = 0xEF;  // 2.5ms
     TL0 = 0xB9;
+
     TR0 = 1;  // restart timer 0
 
     P3_5 = !P3_5;
+
+    frame_translator(line_counter);
+    line_counter++;
+    line_counter %= 8;
 }
 
 void timer1() __interrupt(TF1_VECTOR) __using(0) {
