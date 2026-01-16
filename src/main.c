@@ -22,18 +22,88 @@
 #define BTN_LEFT 0x40
 #define BTN_RIGHT 0x80
 
+#define WIDTH 32
+#define HEIGHT 16
+
 #define BLK (0x00)
 #define RED (0x30)
 #define GRN (0x0C)
 #define BLU (0x03)
 
-// Array for external Matrix
-__xdata uint8_t framebuffer[32][16];
+typedef uint8_t framebuffer_t[HEIGHT][WIDTH];
 
-// Counter for lines in framebuffer
-uint8_t line_counter = 0;
+// __xdata framebuffer_t framebuffer;
+
+__xdata framebuffer_t framebuffer = {
+    /* y = 0 */
+    {
+        RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED,
+        RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED},
+    /* y = 1 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 2 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 3 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 4 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 5 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 6 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 7 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 8 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 9 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, BLK, RED},
+    /* y = 10 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, BLK, RED},
+    /* y = 11 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, BLK, RED},
+    /* y = 12 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, BLK, RED},
+    /* y = 13 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, BLK, RED},
+    /* y = 14 */
+    {
+        RED, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, BLU, RED,
+        RED, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, BLK, GRN, RED},
+    /* y = 15 */
+    {
+        RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED,
+        RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED, RED},
+};
 
 __xdata uint8_t* matrix = (__xdata uint8_t*) 0x4000;
+
+uint8_t line_counter = 0;
 
 typedef enum {
     ASTEROID_SHAPE_BIG,
@@ -47,34 +117,34 @@ typedef struct {
     asteroid_shape_t shape;
 } asteroid_t;
 
-const uint8_t asteroid_middle[4][4] = {{BLU, BLU, BLK, BLU},
-                                       {BLK, BLU, BLU, BLU},
-                                       {BLU, BLU, BLU, BLU},
-                                       {BLU, BLU, BLK, BLK}};
+// const uint8_t asteroid_middle[4][4] = {{BLU, BLU, BLK, BLU},
+//                                        {BLK, BLU, BLU, BLU},
+//                                        {BLU, BLU, BLU, BLU},
+//                                        {BLU, BLU, BLK, BLK}};
 
-const uint8_t asteroid_big[6][5] = {{BLK, BLU, BLK, BLU, BLK},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLK, BLU, BLK, BLU, BLK}};
+// const uint8_t asteroid_big[6][5] = {{BLK, BLU, BLK, BLU, BLK},
+//                                     {BLU, BLU, BLU, BLU, BLU},
+//                                     {BLU, BLU, BLU, BLU, BLU},
+//                                     {BLU, BLU, BLU, BLU, BLU},
+//                                     {BLU, BLU, BLU, BLU, BLU},
+//                                     {BLK, BLU, BLK, BLU, BLK}};
 
-const uint8_t asteroid_small[3][3] = {{BLK, BLK, BLU},
-                                      {BLK, BLU, BLU},
-                                      {BLU, BLU, BLU}};
+// const uint8_t asteroid_small[3][3] = {{BLK, BLK, BLU},
+//                                       {BLK, BLU, BLU},
+//                                       {BLU, BLU, BLU}};
 
 asteroid_t a1 = {8, 8, ASTEROID_SHAPE_SMALL};
 asteroid_t a2 = {8, 8, ASTEROID_SHAPE_SMALL};
 
-void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
+void render_asteroid_shape(asteroid_t* asteroid, framebuffer_t framebuffer) {
     switch (asteroid->shape) {
         case ASTEROID_SHAPE_SMALL: {
-            framebuffer[asteroid->x - 1][asteroid->y + 1] = BLU;
-            framebuffer[asteroid->x][asteroid->y]         = BLU;
-            framebuffer[asteroid->x][asteroid->y + 1]     = BLU;
-            framebuffer[asteroid->x + 1][asteroid->y - 1] = BLU;
-            framebuffer[asteroid->x + 1][asteroid->y]     = BLU;
-            framebuffer[asteroid->x + 1][asteroid->y + 1] = BLU;
+            framebuffer[asteroid->y + 1][asteroid->x - 1] = BLU;
+            framebuffer[asteroid->y][asteroid->x]         = BLU;
+            framebuffer[asteroid->y + 1][asteroid->x]     = BLU;
+            framebuffer[asteroid->y - 1][asteroid->x + 1] = BLU;
+            framebuffer[asteroid->y][asteroid->x + 1]     = BLU;
+            framebuffer[asteroid->y + 1][asteroid->x + 1] = BLU;
             break;
         }
         case ASTEROID_SHAPE_MIDDLE: {
@@ -86,7 +156,7 @@ void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
     }
 }
 
-void render(uint8_t framebuffer[32][16]) {
+void render(framebuffer_t framebuffer) {
     // for (uint8_t i = 0; i < 32; i++) {
     //     for (uint8_t j = 0; j < 16; j++) {
     //         framebuffer[i][j] = BLK;
@@ -94,10 +164,9 @@ void render(uint8_t framebuffer[32][16]) {
     // }
     render_asteroid_shape(&a2, framebuffer);
     render_asteroid_shape(&a1, framebuffer);
+
     a1.x++;
-    if (a1.x >= 32) {
-        a1.x -= 32;
-    }
+    if (a1.x >= 32) a1.x -= 32;
 
     a2.y++;
     if (a2.y >= 16) a2.y -= 16;
@@ -165,25 +234,26 @@ uint8_t read_controller() {
 }
 
 void main() {
-    // timer 0 config
-    TMOD = M0_0;
-    TH0  = 0xEF;  // 2.5ms
-    TL0  = 0xB9;
-
-    // interrupt config
-    EA  = 1;  // enable interrupts
-    ET0 = 1;  // enable timer 0 interrupt
-
-    TR0  = 1;  // enable timer 0
     P3_5 = 1;  // disable LED
 
     NES_LATCH = 0;
     NES_CLK   = 0;
 
+    // interrupt config
+    EA  = 1;  // enable interrupts
+    ET0 = 1;  // enable timer 0 interrupt
+
+    // timer0 config
+    TMOD = M0_0;  // 16-bit mode
+    TH0  = 0xEF;  // 2.5ms
+    TL0  = 0xB9;
+    TR0  = 1;  // enable timer0
+
     while (1) {
+        __asm__("nop");
         // read_controller();
 
-        render(framebuffer);
+        // render(framebuffer);
 
         // for (uint8_t i = 0; i < 3; i++) {
         //     for (uint8_t j = 0; j < 3; j++) {
@@ -194,7 +264,7 @@ void main() {
         //         }
         //     }
         // }
-        tick_delay(10);
+        // tick_delay(10);
     }
 
     // while (1) {
@@ -223,43 +293,209 @@ void main() {
     // }
 }
 
-void write_framebuffer_to_matrix(uint8_t line) {
-    uint8_t x = 0;
-    uint8_t y = line;
-    for (uint8_t i = 0; i < 8; i++) {
-        uint8_t base = (i << 4);
+void timer0() __interrupt(TF0_VECTOR) __naked {
+    // iterating matrix address is kept in P2:R0
+    // framebuffer address is kept in DPH:DPL
 
-        matrix[base + 8] = 0;
-        matrix[base + 0] = framebuffer[x++][y];
-        matrix[base + 1] = framebuffer[x++][y];
-        matrix[base + 2] = framebuffer[x++][y];
-        matrix[base + 3] = framebuffer[x++][y];
-        matrix[base + 4] = framebuffer[x++][y];
-        matrix[base + 5] = framebuffer[x++][y];
-        matrix[base + 6] = framebuffer[x++][y];
-        matrix[base + 7] = framebuffer[x++][y];
-        matrix[base + 8] = line | 0x08;
-        if (i == 3) {
-            y = y + 8;
-            x = 0;
-        }
-    }
-}
+    // P2 = matrix address high byte
 
-void timer0() __interrupt(TF0_VECTOR) __using(1) {
-    TH0 = 0xEF;  // 2.5ms
-    TL0 = 0xB9;
+    // R0 = matrix address low byte (iterator)
+    // R1 = matrix address low byte (for line clear)
+    // R2 = framebuffer address low byte
+    // R3 = framebuffer address high byte
+    // R4 = matrix cmd (line | 0x08)
+    // R5 = matrix segement loop
+    // R6
+    // R7
 
-    TR0 = 1;  // restart timer 0
+    // clang-format off
+__asm
+; Debug LED
+    ;setb	_P3_5
 
-    P3_5 = 1;
-    write_framebuffer_to_matrix(line_counter);
-    line_counter++;
-    if (line_counter == 8) {
-        line_counter = 0;
-        tick_counter++;
-    }
-    P3_5 = 0;
+; Prologue: select bank 1
+    push    psw
+    mov     psw,#0x08
+
+; Prologue: save context
+    push    acc
+    push    b
+    push    dpl
+    push    dph
+    push    p2
+
+; Restart Timer
+    mov	    _TH0,#0xef
+    mov	    _TL0,#0xb9
+    setb	_TR0
+
+; Prepare matrix cmd
+    mov     a,_line_counter
+    orl     a,#0x08
+    mov     r4,a
+
+; Load matrix address pointers
+    mov     dptr,#_matrix
+    mov     a,dpl
+    mov     r0,a
+    add     a,#8
+    mov     r1,a
+    mov     a,dph
+    mov     p2,a
+
+; Load framebuffer address pointer DPTR
+    mov     dptr,#_framebuffer
+
+; Offset framebuffer address (DPTR) + line counter (R7) * 16 * 2
+    mov     a,_line_counter
+    swap    a
+    rl      a
+    add     a,dpl
+    mov     dpl,a
+    mov     a, dph
+    addc    a,#0
+    mov     dph,a
+
+; Save framebuffer address in R3:R2
+    mov     r3,dph
+    mov     r2,dpl
+
+; loop through first 4 matrix modules
+    mov     r5,#4
+matrix_modules_loop_0:
+
+; clear matrix line
+    mov     a,#0
+    movx    @r1,a
+
+; Read/Write 8 Pixels
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+
+; send matrix enable cmd
+    mov     a,r4
+    movx    @r0,a
+    
+; advance matrix address pointers to next module
+    mov     a,r0
+    add     a,#8
+    mov     r0,a
+    add     a,#8
+    mov     r1,a
+
+    djnz    r5,matrix_modules_loop_0
+
+; advance to the second row in the framebuffer
+    mov     dpl,r2
+    mov     dph,r3
+    inc     dph
+
+; loop through second 4 matrix modules
+    mov     r5,#4
+matrix_modules_loop_1:
+
+; clear matrix line
+    mov     a,#0
+    movx    @r1,a
+
+; Read/Write 8 Pixels
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+    movx    a,@dptr
+    inc     dptr
+    movx    @r0,a
+    inc     r0
+
+; send matrix enable cmd
+    mov     a,r4
+    movx    @r0,a
+    
+; advance matrix address pointers to next module
+    mov     a,r0
+    add     a,#8
+    mov     r0,a
+    add     a,#8
+    mov     r1,a
+
+    djnz    r5,matrix_modules_loop_1
+
+; increment line counter
+    mov     a,_line_counter
+    inc     a
+    anl     a,#0x07
+    mov     _line_counter,a
+
+; Epilogue: Restore Context
+    pop     p2
+    pop     dph
+    pop     dpl
+    pop     b
+    pop     acc
+    pop     psw
+
+; Debug LED
+    clr	_P3_5
+
+    reti
+
+__endasm;
+    // clang-format on
 }
 
 void timer1() __interrupt(TF1_VECTOR) __using(0) {
