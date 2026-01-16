@@ -13,19 +13,22 @@
 #define NES_DATA P1_1
 
 // Button bitmapping for NES controller
-#define BTN_A 0x01
-#define BTN_B 0x02
-#define BTN_SELECT 0x04
-#define BTN_START 0x08
-#define BTN_UP 0x10
-#define BTN_DOWN 0x20
-#define BTN_LEFT 0x40
-#define BTN_RIGHT 0x80
+#define BTN_RIGHT 0x01
+#define BTN_LEFT 0x02
+#define BTN_DOWN 0x04
+#define BTN_UP 0x08
+#define BTN_START 0x10
+#define BTN_SELECT 0x20
+#define BTN_B 0x40
+#define BTN_A 0x80
+
+uint8_t old_controller = 0;
 
 #define BLK (0x00)
 #define RED (0x30)
 #define GRN (0x0C)
 #define BLU (0x03)
+#define WHT (0x3F)
 
 // Array for external Matrix
 __xdata uint8_t framebuffer[32][16];
@@ -47,6 +50,11 @@ typedef struct {
     asteroid_shape_t shape;
 } asteroid_t;
 
+typedef struct {
+    uint8_t x;
+    uint8_t y;
+} spaceship_t;
+
 const uint8_t asteroid_middle[4][4] = {{BLU, BLU, BLK, BLU},
                                        {BLK, BLU, BLU, BLU},
                                        {BLU, BLU, BLU, BLU},
@@ -65,6 +73,8 @@ const uint8_t asteroid_small[3][3] = {{BLK, BLK, BLU},
 
 asteroid_t a1 = {8, 8, ASTEROID_SHAPE_SMALL};
 asteroid_t a2 = {8, 8, ASTEROID_SHAPE_SMALL};
+
+spaceship_t spaceship = {3, 8};
 
 void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
     switch (asteroid->shape) {
@@ -86,21 +96,28 @@ void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
     }
 }
 
+void render_spaceship(uint8_t color) {
+    framebuffer[spaceship.x][spaceship.y]     = color;
+    framebuffer[spaceship.x + 1][spaceship.y] = color;
+    framebuffer[spaceship.x][spaceship.y - 1] = color;
+    framebuffer[spaceship.x][spaceship.y + 1] = color;
+}
+
 void render(uint8_t framebuffer[32][16]) {
     // for (uint8_t i = 0; i < 32; i++) {
     //     for (uint8_t j = 0; j < 16; j++) {
     //         framebuffer[i][j] = BLK;
     //     }
     // }
-    render_asteroid_shape(&a2, framebuffer);
-    render_asteroid_shape(&a1, framebuffer);
-    a1.x++;
-    if (a1.x >= 32) {
-        a1.x -= 32;
-    }
+    // render_asteroid_shape(&a2, framebuffer);
+    // render_asteroid_shape(&a1, framebuffer);
+    // a1.x++;
+    // if (a1.x >= 32) {
+    //     a1.x -= 32;
+    // }
 
-    a2.y++;
-    if (a2.y >= 16) a2.y -= 16;
+    // a2.y++;
+    // if (a2.y >= 16) a2.y -= 16;
 }
 
 uint16_t tick_counter     = 0;  // one tick is 20 ms
@@ -142,24 +159,15 @@ uint8_t read_controller() {
     NES_LATCH = 1;
     NES_LATCH = 0;
 
-    bool pressed = (NES_DATA == 0);
-    value |= pressed;
+    value = (NES_DATA == 0);
 
     for (uint8_t i = 1; i < 8; i++) {
         NES_CLK = 1;
         NES_CLK = 0;
 
-        pressed = (NES_DATA == 0);
-        value |= (pressed << i);
-
-        // if (pressed) {
-        //     matrix[i] = 0b00110000;
-        // } else {
-        //     matrix[i] = 0b0000000;
-        // }
+        value <<= 1;
+        value |= (NES_DATA == 0);
     }
-
-    // matrix[8] = 0b00001000;
 
     return value;
 }
@@ -180,10 +188,40 @@ void main() {
     NES_LATCH = 0;
     NES_CLK   = 0;
 
-    while (1) {
-        // read_controller();
+    render_spaceship(WHT);
 
-        render(framebuffer);
+    while (1) {
+        uint8_t controller = read_controller();
+
+        // render(framebuffer);
+
+        if ((controller & BTN_UP) && spaceship.y >= 2) {
+            render_spaceship(BLK);
+            spaceship.y -= 1;
+            render_spaceship(WHT);
+        }
+
+        if ((controller & BTN_DOWN) && spaceship.y <= 13) {
+            render_spaceship(BLK);
+            spaceship.y += 1;
+            render_spaceship(WHT);
+        }
+
+        if ((controller & BTN_RIGHT) && spaceship.x <= 29) {
+            render_spaceship(BLK);
+            spaceship.x += 1;
+            render_spaceship(WHT);
+        }
+
+        if ((controller & BTN_LEFT) && spaceship.x >= 1) {
+            render_spaceship(BLK);
+            spaceship.x -= 1;
+            render_spaceship(WHT);
+        }
+
+        old_controller = controller;
+
+        msdelay(20);
 
         // for (uint8_t i = 0; i < 3; i++) {
         //     for (uint8_t j = 0; j < 3; j++) {
@@ -194,7 +232,6 @@ void main() {
         //         }
         //     }
         // }
-        tick_delay(10);
     }
 
     // while (1) {
