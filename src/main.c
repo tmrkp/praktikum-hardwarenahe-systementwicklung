@@ -30,11 +30,11 @@ uint8_t old_controller = 0;
 #define BLU (0x03)
 #define WHT (0x3F)
 
-// Array for external Matrix
-__xdata uint8_t framebuffer[32][16];
+#define WIDTH 32
+#define HEIGHT 16
 
-// Counter for lines in framebuffer
-uint8_t line_counter = 0;
+// Array for external Matrix
+__xdata uint8_t framebuffer[HEIGHT][WIDTH];
 
 __xdata uint8_t* matrix = (__xdata uint8_t*) 0x4000;
 
@@ -86,15 +86,15 @@ spaceship_t spaceship = {3, 8};
 laser_t laser[8];
 uint8_t laser_index = 0;
 
-void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
+void render_asteroid_shape(asteroid_t* asteroid) {
     switch (asteroid->shape) {
         case ASTEROID_SHAPE_SMALL: {
-            framebuffer[asteroid->x - 1][asteroid->y + 1] = BLU;
-            framebuffer[asteroid->x][asteroid->y]         = BLU;
-            framebuffer[asteroid->x][asteroid->y + 1]     = BLU;
-            framebuffer[asteroid->x + 1][asteroid->y - 1] = BLU;
-            framebuffer[asteroid->x + 1][asteroid->y]     = BLU;
-            framebuffer[asteroid->x + 1][asteroid->y + 1] = BLU;
+            framebuffer[asteroid->y + 1][asteroid->x - 1] = BLU;
+            framebuffer[asteroid->y][asteroid->x]         = BLU;
+            framebuffer[asteroid->y + 1][asteroid->x]     = BLU;
+            framebuffer[asteroid->y - 1][asteroid->x + 1] = BLU;
+            framebuffer[asteroid->y][asteroid->x + 1]     = BLU;
+            framebuffer[asteroid->y + 1][asteroid->x + 1] = BLU;
             break;
         }
         case ASTEROID_SHAPE_MIDDLE: {
@@ -106,11 +106,11 @@ void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
     }
 }
 
-void render_spaceship(uint8_t color) {
-    framebuffer[spaceship.x][spaceship.y]     = color;
-    framebuffer[spaceship.x + 1][spaceship.y] = color;
-    framebuffer[spaceship.x][spaceship.y - 1] = color;
-    framebuffer[spaceship.x][spaceship.y + 1] = color;
+inline void render_spaceship(uint8_t color) {
+    framebuffer[spaceship.y][spaceship.x]     = color;
+    framebuffer[spaceship.y][spaceship.x + 1] = color;
+    framebuffer[spaceship.y - 1][spaceship.x] = color;
+    framebuffer[spaceship.y + 1][spaceship.x] = color;
 }
 
 void render(uint8_t framebuffer[32][16]) {
@@ -202,8 +202,6 @@ void main() {
 
     while (1) {
         uint8_t controller = read_controller();
-
-        // render(framebuffer);
 
         if ((controller & BTN_UP) && spaceship.y >= 2) {
             render_spaceship(BLK);
@@ -351,42 +349,69 @@ void main() {
     // }
 }
 
-void write_framebuffer_to_matrix(uint8_t line) {
-    uint8_t x = 0;
-    uint8_t y = line;
-    for (uint8_t i = 0; i < 8; i++) {
-        uint8_t base = (i << 4);
-
-        matrix[base + 8] = 0;
-        matrix[base + 0] = framebuffer[x++][y];
-        matrix[base + 1] = framebuffer[x++][y];
-        matrix[base + 2] = framebuffer[x++][y];
-        matrix[base + 3] = framebuffer[x++][y];
-        matrix[base + 4] = framebuffer[x++][y];
-        matrix[base + 5] = framebuffer[x++][y];
-        matrix[base + 6] = framebuffer[x++][y];
-        matrix[base + 7] = framebuffer[x++][y];
-        matrix[base + 8] = line | 0x08;
-        if (i == 3) {
-            y = y + 8;
-            x = 0;
-        }
-    }
-}
-
 void timer0() __interrupt(TF0_VECTOR) __using(1) {
+    static uint8_t line = 0;
+
+    uint8_t i;
+    uint8_t cmd;
+
+    __xdata uint8_t* m_ptr;
+    __xdata uint8_t* f_ptr;
+
     TH0 = 0xEF;  // 2.5ms
     TL0 = 0xB9;
-
     TR0 = 1;  // restart timer 0
 
+    cmd = line | 0x8;
+
+    m_ptr = matrix;
+    f_ptr = framebuffer;
+
     P3_5 = 1;
-    write_framebuffer_to_matrix(line_counter);
-    line_counter++;
-    if (line_counter == 8) {
-        line_counter = 0;
-        tick_counter++;
-    }
+
+    f_ptr += (line << 5);
+
+    i = 4;
+    do {
+        *(m_ptr + 8) = 0;
+
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+
+        *m_ptr = cmd;
+
+        m_ptr += 8;
+    } while (--i > 0);
+
+    f_ptr += 224;
+
+    i = 4;
+    do {
+        *(m_ptr + 8) = 0;
+
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+        *m_ptr++ = *f_ptr++;
+
+        *m_ptr = cmd;
+
+        m_ptr += 8;
+    } while (--i > 0);
+
+    line++;
+    if (line >= 8) line = 0;
+
     P3_5 = 0;
 }
 
