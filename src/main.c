@@ -55,6 +55,13 @@ typedef struct {
     uint8_t y;
 } spaceship_t;
 
+typedef struct
+{
+    uint8_t x;
+    uint8_t y;
+    bool    visible;
+} laser_t;
+
 const uint8_t asteroid_middle[4][4] = {{BLU, BLU, BLK, BLU},
                                        {BLK, BLU, BLU, BLU},
                                        {BLU, BLU, BLU, BLU},
@@ -75,6 +82,9 @@ asteroid_t a1 = {8, 8, ASTEROID_SHAPE_SMALL};
 asteroid_t a2 = {8, 8, ASTEROID_SHAPE_SMALL};
 
 spaceship_t spaceship = {3, 8};
+
+laser_t laser[8];
+uint8_t laser_index = 0;
 
 void render_asteroid_shape(asteroid_t* asteroid, uint8_t framebuffer[32][16]) {
     switch (asteroid->shape) {
@@ -217,6 +227,87 @@ void main() {
             render_spaceship(BLK);
             spaceship.x -= 1;
             render_spaceship(WHT);
+        }
+
+        if ((controller & BTN_A) && !(old_controller & BTN_A)) {
+            laser[laser_index].x       = spaceship.x + 2;
+            laser[laser_index].y       = spaceship.y;
+            laser[laser_index].visible = true;
+            laser_index++;
+            if (laser_index >= 8) laser_index = 0;
+        }
+
+        if (laser[0].visible) {
+            framebuffer[laser[0].x][laser[0].y] = BLK;
+            laser[0].x++;
+            if (laser[0].x >= 32) {
+                laser[0].visible = 0;
+            } else {
+                framebuffer[laser[0].x][laser[0].y] = RED;
+            }
+        }
+        if (laser[1].visible) {
+            framebuffer[laser[1].x][laser[1].y] = BLK;
+            laser[1].x++;
+            if (laser[1].x >= 32) {
+                laser[1].visible = 0;
+            } else {
+                framebuffer[laser[1].x][laser[1].y] = RED;
+            }
+        }
+        if (laser[2].visible) {
+            framebuffer[laser[2].x][laser[2].y] = BLK;
+            laser[2].x++;
+            if (laser[2].x >= 32) {
+                laser[2].visible = 0;
+            } else {
+                framebuffer[laser[2].x][laser[2].y] = RED;
+            }
+        }
+        if (laser[3].visible) {
+            framebuffer[laser[3].x][laser[3].y] = BLK;
+            laser[3].x++;
+            if (laser[3].x >= 32) {
+                laser[3].visible = 0;
+            } else {
+                framebuffer[laser[3].x][laser[3].y] = RED;
+            }
+        }
+        if (laser[4].visible) {
+            framebuffer[laser[4].x][laser[4].y] = BLK;
+            laser[4].x++;
+            if (laser[4].x >= 32) {
+                laser[4].visible = 0;
+            } else {
+                framebuffer[laser[4].x][laser[4].y] = RED;
+            }
+        }
+        if (laser[5].visible) {
+            framebuffer[laser[5].x][laser[5].y] = BLK;
+            laser[5].x++;
+            if (laser[5].x >= 32) {
+                laser[5].visible = 0;
+            } else {
+                framebuffer[laser[5].x][laser[5].y] = RED;
+            }
+        }
+        if (laser[6].visible) {
+            framebuffer[laser[6].x][laser[6].y] = BLK;
+            laser[6].x++;
+            if (laser[6].x >= 32) {
+                laser[6].visible = 0;
+            } else {
+                framebuffer[laser[6].x][laser[6].y] = RED;
+            }
+        }
+        if (laser[7].visible) {
+            framebuffer[laser[7].x][laser[7].y] = BLK;
+            laser[7].x++;
+            if (laser[7].x >= 32) {
+                laser[7].visible = 0;
+            } else {
+                framebuffer[laser[7].x][laser[7].y] = RED;
+            }
         }
 
         old_controller = controller;
