@@ -36,7 +36,7 @@ uint8_t old_controller = 0;
 // Array for external Matrix
 __xdata uint8_t framebuffer[HEIGHT][WIDTH];
 
-__xdata uint8_t* matrix = (__xdata uint8_t*) 0x4000;
+__pdata uint8_t* matrix = (__pdata uint8_t*) 0x00;
 
 typedef enum {
     ASTEROID_SHAPE_BIG,
@@ -113,48 +113,16 @@ inline void render_spaceship(uint8_t color) {
     framebuffer[spaceship.y + 1][spaceship.x] = color;
 }
 
-void render(uint8_t framebuffer[32][16]) {
-    // for (uint8_t i = 0; i < 32; i++) {
-    //     for (uint8_t j = 0; j < 16; j++) {
-    //         framebuffer[i][j] = BLK;
-    //     }
-    // }
-    // render_asteroid_shape(&a2, framebuffer);
-    // render_asteroid_shape(&a1, framebuffer);
-    // a1.x++;
-    // if (a1.x >= 32) {
-    //     a1.x -= 32;
-    // }
-
-    // a2.y++;
-    // if (a2.y >= 16) a2.y -= 16;
-}
-
-uint16_t tick_counter     = 0;  // one tick is 20 ms
-uint16_t tick_delay_start = 0;
-
-void tick_delay(uint16_t ticks) {
-    tick_delay_start = tick_counter;
-    while (tick_counter < tick_delay_start + ticks) {
-        // no nothing
-    }
-}
-
-uint8_t test_external_ram(uint8_t* ptr, uint16_t size) {
-    uint8_t patterns[] = {0x00, 0xFF, 0xAA, 0x55};
-
-    for (uint16_t i = 0; i < size; i++) {
-        ptr[i] = patterns[i % 4];
-    }
-
-    for (uint16_t i = 0; i < size; i++) {
-        uint8_t read_value = ptr[i];
-        if (read_value != patterns[i % 4]) {
-            return 1;
+inline void render_laser(uint8_t index) {
+    if (laser[index].visible) {
+        framebuffer[laser[index].y][laser[index].x] = BLK;
+        laser[index].x++;
+        if (laser[index].x >= 32) {
+            laser[index].visible = 0;
+        } else {
+            framebuffer[laser[index].y][laser[index].x] = RED;
         }
     }
-
-    return 0;
 }
 
 void msdelay(uint16_t value) {
@@ -171,13 +139,14 @@ uint8_t read_controller() {
 
     value = (NES_DATA == 0);
 
-    for (uint8_t i = 1; i < 8; i++) {
+    uint8_t i = 7;
+    do {
         NES_CLK = 1;
         NES_CLK = 0;
 
         value <<= 1;
         value |= (NES_DATA == 0);
-    }
+    } while (--i > 0);
 
     return value;
 }
@@ -194,6 +163,8 @@ void main() {
 
     TR0  = 1;  // enable timer 0
     P3_5 = 1;  // disable LED
+
+    P2 = 0x40;
 
     NES_LATCH = 0;
     NES_CLK   = 0;
@@ -235,146 +206,55 @@ void main() {
             if (laser_index >= 8) laser_index = 0;
         }
 
-        if (laser[0].visible) {
-            framebuffer[laser[0].x][laser[0].y] = BLK;
-            laser[0].x++;
-            if (laser[0].x >= 32) {
-                laser[0].visible = 0;
-            } else {
-                framebuffer[laser[0].x][laser[0].y] = RED;
-            }
-        }
-        if (laser[1].visible) {
-            framebuffer[laser[1].x][laser[1].y] = BLK;
-            laser[1].x++;
-            if (laser[1].x >= 32) {
-                laser[1].visible = 0;
-            } else {
-                framebuffer[laser[1].x][laser[1].y] = RED;
-            }
-        }
-        if (laser[2].visible) {
-            framebuffer[laser[2].x][laser[2].y] = BLK;
-            laser[2].x++;
-            if (laser[2].x >= 32) {
-                laser[2].visible = 0;
-            } else {
-                framebuffer[laser[2].x][laser[2].y] = RED;
-            }
-        }
-        if (laser[3].visible) {
-            framebuffer[laser[3].x][laser[3].y] = BLK;
-            laser[3].x++;
-            if (laser[3].x >= 32) {
-                laser[3].visible = 0;
-            } else {
-                framebuffer[laser[3].x][laser[3].y] = RED;
-            }
-        }
-        if (laser[4].visible) {
-            framebuffer[laser[4].x][laser[4].y] = BLK;
-            laser[4].x++;
-            if (laser[4].x >= 32) {
-                laser[4].visible = 0;
-            } else {
-                framebuffer[laser[4].x][laser[4].y] = RED;
-            }
-        }
-        if (laser[5].visible) {
-            framebuffer[laser[5].x][laser[5].y] = BLK;
-            laser[5].x++;
-            if (laser[5].x >= 32) {
-                laser[5].visible = 0;
-            } else {
-                framebuffer[laser[5].x][laser[5].y] = RED;
-            }
-        }
-        if (laser[6].visible) {
-            framebuffer[laser[6].x][laser[6].y] = BLK;
-            laser[6].x++;
-            if (laser[6].x >= 32) {
-                laser[6].visible = 0;
-            } else {
-                framebuffer[laser[6].x][laser[6].y] = RED;
-            }
-        }
-        if (laser[7].visible) {
-            framebuffer[laser[7].x][laser[7].y] = BLK;
-            laser[7].x++;
-            if (laser[7].x >= 32) {
-                laser[7].visible = 0;
-            } else {
-                framebuffer[laser[7].x][laser[7].y] = RED;
-            }
-        }
+        render_laser(0);
+        render_laser(1);
+        render_laser(2);
+        render_laser(3);
+        render_laser(4);
+        render_laser(5);
+        render_laser(6);
+        render_laser(7);
 
         old_controller = controller;
 
         msdelay(20);
-
-        // for (uint8_t i = 0; i < 3; i++) {
-        //     for (uint8_t j = 0; j < 3; j++) {
-        //         uint8_t x = 8 + i - 1;  // To center the asteroid on coordinate x
-        //         uint8_t y = 8 + j - 1;  // To center the asteroid on coordinate y
-        //         if (x >= 0 && y >= 0 && x < 32 && y < 16) {
-        //             framebuffer[x][y] = asteroid_small[i][j];
-        //         }
-        //     }
-        // }
     }
-
-    // while (1) {
-    //     test_external_ram(buffer, 2000);
-    // }
-
-    // while (1) {
-    //     if (test_external_ram(buffer, 8192) == 0) {
-    //         P3_5 = 0;
-    //         msdelay(1000);
-    //         P3_5 = 1;
-    //         msdelay(1000);
-    //     } else {
-    //         P3_5 = 0;
-    //         msdelay(250);
-    //         P3_5 = 1;
-    //         msdelay(250);
-    //     }
-    // }
-
-    // while (1) {
-    //     P3_5 = 0;
-    //     msdelay(250);
-    //     P3_5 = 1;
-    //     msdelay(250);
-    // }
 }
 
 void timer0() __interrupt(TF0_VECTOR) __using(1) {
+    // remember scan line across ISR calls
     static uint8_t line = 0;
 
     uint8_t i;
     uint8_t cmd;
 
-    __xdata uint8_t* m_ptr;
+    __pdata uint8_t* m_ptr;
     __xdata uint8_t* f_ptr;
 
+    // restart timer 0
     TH0 = 0xEF;  // 2.5ms
     TL0 = 0xB9;
-    TR0 = 1;  // restart timer 0
+    TR0 = 1;
 
+    // prepare matrix cmd to write line
     cmd = line | 0x8;
 
+    // base pointers to matrix and framebuffer
     m_ptr = matrix;
     f_ptr = framebuffer;
 
     P3_5 = 1;
 
+    // shift framebuffer pointer to the currently scanned line
     f_ptr += (line << 5);
 
+    // loop through first 4 matrix modules
     i = 4;
     do {
+        // clear line command
         *(m_ptr + 8) = 0;
 
+        // write 8 pixels from RAM to Matrix
         *m_ptr++ = *f_ptr++;
         *m_ptr++ = *f_ptr++;
         *m_ptr++ = *f_ptr++;
@@ -384,17 +264,22 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
         *m_ptr++ = *f_ptr++;
         *m_ptr++ = *f_ptr++;
 
+        // send matrix cmd to write line
         *m_ptr = cmd;
 
         m_ptr += 8;
     } while (--i > 0);
 
+    // wrap framebuffer pointer to send row (32 * 8) - 32
     f_ptr += 224;
 
+    // loop through send 4 matrix modules
     i = 4;
     do {
+        // clear line command
         *(m_ptr + 8) = 0;
 
+        // write 8 pixels from RAM to Matrix
         *m_ptr++ = *f_ptr++;
         *m_ptr++ = *f_ptr++;
         *m_ptr++ = *f_ptr++;
@@ -404,11 +289,13 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
         *m_ptr++ = *f_ptr++;
         *m_ptr++ = *f_ptr++;
 
+        // send matrix cmd to write line
         *m_ptr = cmd;
 
         m_ptr += 8;
     } while (--i > 0);
 
+    // advance to next scan line for the next ISR call
     line++;
     if (line >= 8) line = 0;
 
