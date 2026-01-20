@@ -25,10 +25,19 @@
 uint8_t old_controller = 0;
 
 #define BLK (0x00)
+#define WHT (0x3F)
+
 #define RED (0x30)
 #define GRN (0x0C)
 #define BLU (0x03)
-#define WHT (0x3F)
+
+#define YEL (0x3C)
+#define MAG (0x33)
+#define CYN (0x0F)
+
+#define ORG (0x38)
+
+#define RED_LIGHT (0x10)
 
 #define WIDTH 32
 #define HEIGHT 16
@@ -63,11 +72,13 @@ typedef struct {
     int8_t           y;
     asteroid_shape_t shape;
     bool             visible;
+    uint8_t          hp;
 } asteroid_t;
 
 typedef struct {
     uint8_t x;
     uint8_t y;
+    uint8_t hp;
 } spaceship_t;
 
 typedef struct {
@@ -76,7 +87,7 @@ typedef struct {
     bool    visible;
 } laser_t;
 
-spaceship_t spaceship = {3, 8};
+spaceship_t spaceship = {3, 8, 8};
 
 asteroid_t asteroids[8];
 uint8_t    asteroids_index = 0;
@@ -84,17 +95,48 @@ uint8_t    asteroids_index = 0;
 laser_t laser[8];
 uint8_t laser_index = 0;
 
+void spaceship_hit(uint8_t index) {
+    switch (asteroids[index].shape) {
+        case ASTEROID_SHAPE_BIG: {
+            spaceship.hp -= 4;
+            break;
+        }
+        case ASTEROID_SHAPE_MIDDLE: {
+            spaceship.hp -= 2;
+            break;
+        }
+        case ASTEROID_SHAPE_SMALL: {
+            spaceship.hp -= 1;
+            break;
+        }
+    }
+}
+
 bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
     return (x + w >= 0) && (x < WIDTH) && (y + h >= 0) && (y <= HEIGHT);
 }
 
-bool render_asteroid_shape(uint8_t index, uint8_t color) {
+typedef enum {
+    RENDER_ASTEROID_SHAPE_RETURN_NOTHING = 0,
+    RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE,
+    RENDER_ASTEROID_SHAPE_RETURN_HITSHIP
+} render_asteroid_shape_return_t;
+
+render_asteroid_shape_return_t render_asteroid_shape(uint8_t index, uint8_t color) {
     uint8_t x = asteroids[index].x;
     uint8_t y = asteroids[index].y;
 
+    bool hitship = false;
+
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_SMALL: {
-            if (!fits_on_screen(x, y, 3, 3)) return false;
+            if (!fits_on_screen(x, y, 3, 3)) return RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE;
+
+            if (framebuffer[y + 0][x + 0] == WHT ||
+                framebuffer[y + 1][x + 0] == WHT ||
+                framebuffer[y + 2][x + 0] == WHT) {
+                hitship = true;
+            }
 
             SET_PIXEL(x + 0, y + 0, color);
             SET_PIXEL(x + 0, y + 1, color);
@@ -107,7 +149,14 @@ bool render_asteroid_shape(uint8_t index, uint8_t color) {
             break;
         }
         case ASTEROID_SHAPE_MIDDLE: {
-            if (!fits_on_screen(x, y, 4, 4)) return false;
+            if (!fits_on_screen(x, y, 4, 4)) return RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE;
+
+            if (framebuffer[y + 0][x + 2] == WHT ||
+                framebuffer[y + 1][x + 1] == WHT ||
+                framebuffer[y + 2][x + 0] == WHT ||
+                framebuffer[y + 3][x + 1] == WHT) {
+                hitship = true;
+            }
 
             SET_PIXEL(x + 0, y + 2, color);
 
@@ -124,7 +173,15 @@ bool render_asteroid_shape(uint8_t index, uint8_t color) {
             break;
         }
         case ASTEROID_SHAPE_BIG: {
-            if (!fits_on_screen(x, y, 6, 5)) return false;
+            if (!fits_on_screen(x, y, 6, 5)) return RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE;
+
+            if (framebuffer[y + 0][x + 3] == WHT ||
+                framebuffer[y + 1][x + 2] == WHT ||
+                framebuffer[y + 2][x + 1] == WHT ||
+                framebuffer[y + 3][x + 0] == WHT ||
+                framebuffer[y + 4][x + 1] == WHT) {
+                hitship = true;
+            }
 
             SET_PIXEL(x + 0, y + 1, color);
             SET_PIXEL(x + 0, y + 2, color);
@@ -158,7 +215,11 @@ bool render_asteroid_shape(uint8_t index, uint8_t color) {
         }
     }
 
-    return true;
+    if (hitship) {
+        return RENDER_ASTEROID_SHAPE_RETURN_HITSHIP;
+    }
+
+    return RENDER_ASTEROID_SHAPE_RETURN_NOTHING;
 }
 
 void render_asteroid(uint8_t index) {
@@ -167,9 +228,69 @@ void render_asteroid(uint8_t index) {
     }
     render_asteroid_shape(index, BLK);
     asteroids[index].x -= 1;
-    if (!render_asteroid_shape(index, BLU)) {
-        asteroids[index].visible = false;
+
+    uint8_t color;
+
+    switch (asteroids[index].hp) {
+        case 1: {
+            color = ORG;
+            break;
+        }
+        case 2: {
+            color = YEL;
+            break;
+        }
+        case 3: {
+            color = BLU;
+            break;
+        }
     }
+
+    switch (render_asteroid_shape(index, color)) {
+        case RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE: {
+            break;
+        };
+        case RENDER_ASTEROID_SHAPE_RETURN_HITSHIP: {
+            spaceship_hit(index);
+            break;
+        };
+    };
+}
+
+bool asteroid_hit(uint8_t index, uint8_t x, uint8_t y) {
+    if (!asteroids[index].visible) return false;
+
+    uint8_t ax = asteroids[index].x;
+    uint8_t ay = asteroids[index].y;
+    switch (asteroids[index].shape) {
+        case ASTEROID_SHAPE_BIG: {
+            if (!(x >= ax && x <= ax + 5 && y >= ay && y <= ay + 4)) {
+                return false;
+            }
+            break;
+        }
+        case ASTEROID_SHAPE_MIDDLE: {
+            if (!(x >= ax && x <= ax + 3 && y >= ay && y <= ay + 3)) {
+                return false;
+            }
+            break;
+        }
+        case ASTEROID_SHAPE_SMALL: {
+            if (!(x >= ax && x <= ax + 2 && y >= ay && y <= ay + 2)) {
+                return false;
+            }
+            break;
+        }
+    }
+
+    asteroids[index].hp--;
+
+    if (asteroids[index].hp == 0) {
+        asteroids[index].visible = false;
+        render_asteroid_shape(index, BLK);
+    }
+
+    return true;
 }
 
 void render_spaceship(uint8_t color) {
@@ -180,14 +301,49 @@ void render_spaceship(uint8_t color) {
 }
 
 void render_laser(uint8_t index) {
-    if (laser[index].visible) {
-        framebuffer[laser[index].y][laser[index].x] = BLK;
-        laser[index].x++;
-        if (laser[index].x >= 32) {
-            laser[index].visible = 0;
-        } else {
-            framebuffer[laser[index].y][laser[index].x] = RED;
+    if (!laser[index].visible) {
+        return;
+    }
+    framebuffer[laser[index].y][laser[index].x] = BLK;
+    laser[index].x++;
+    if (laser[index].x >= 32) {
+        laser[index].visible = 0;
+        return;
+    }
+
+    if (framebuffer[laser[index].y][laser[index].x] != BLK) {
+        // hit!
+        if (asteroid_hit(0, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(1, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(2, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(3, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(4, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(5, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(6, laser[index].x, laser[index].y)) {
+        } else if (asteroid_hit(7, laser[index].x, laser[index].y)) {
         }
+
+        laser[index].visible = 0;
+        return;
+    }
+
+    framebuffer[laser[index].y][laser[index].x] = RED;
+}
+
+void render_healthbar() {
+    static uint8_t last_hp = -1;
+
+    if (last_hp != spaceship.hp) {
+        framebuffer[0][0] = (spaceship.hp >= 1) ? RED : RED_LIGHT;
+        framebuffer[0][1] = (spaceship.hp >= 2) ? RED : RED_LIGHT;
+        framebuffer[0][2] = (spaceship.hp >= 3) ? RED : RED_LIGHT;
+        framebuffer[0][3] = (spaceship.hp >= 4) ? RED : RED_LIGHT;
+        framebuffer[0][4] = (spaceship.hp >= 5) ? RED : RED_LIGHT;
+        framebuffer[0][5] = (spaceship.hp >= 6) ? RED : RED_LIGHT;
+        framebuffer[0][6] = (spaceship.hp >= 7) ? RED : RED_LIGHT;
+        framebuffer[0][7] = (spaceship.hp >= 8) ? RED : RED_LIGHT;
+
+        last_hp = spaceship.hp;
     }
 }
 
@@ -274,14 +430,7 @@ void main() {
 
         uint8_t controller = read_controller();
 
-        if (controller & BTN_SELECT) {
-            P3_5 = 0;
-        } else {
-            P3_5 = 1;
-        }
-
         if ((controller & BTN_UP) && spaceship.y >= 2) {
-            render_spaceship(BLK);
             spaceship.y -= 1;
             render_spaceship(WHT);
         }
@@ -304,6 +453,30 @@ void main() {
             render_spaceship(WHT);
         }
 
+        if (tick - last_asteroid_tick > 200) {
+            int8_t y     = rand() & 0x0F;
+            int8_t shape = rand() & 0x03;
+            if (shape == 3) shape = 1;
+            asteroids[asteroids_index].y       = y - 2;
+            asteroids[asteroids_index].x       = 31;
+            asteroids[asteroids_index].visible = true;
+            asteroids[asteroids_index].shape   = shape;
+            asteroids[asteroids_index].hp      = 3;
+            asteroids_index++;
+            if (asteroids_index >= 8) asteroids_index = 0;
+
+            last_asteroid_tick = tick;
+        }
+
+        render_asteroid(0);
+        render_asteroid(1);
+        render_asteroid(2);
+        render_asteroid(3);
+        render_asteroid(4);
+        render_asteroid(5);
+        render_asteroid(6);
+        render_asteroid(7);
+
         if ((controller & BTN_A) && !(old_controller & BTN_A)) {
             laser[laser_index].x       = spaceship.x + 2;
             laser[laser_index].y       = spaceship.y;
@@ -321,26 +494,7 @@ void main() {
         render_laser(6);
         render_laser(7);
 
-        if (tick - last_asteroid_tick > 200) {
-            uint8_t y                          = rand() & 0x0F;
-            asteroids[asteroids_index].y       = y;
-            asteroids[asteroids_index].x       = 31;
-            asteroids[asteroids_index].visible = true;
-            asteroids[asteroids_index].shape   = ASTEROID_SHAPE_BIG;
-            asteroids_index++;
-            if (asteroids_index >= 8) asteroids_index = 0;
-
-            last_asteroid_tick = tick;
-        }
-
-        render_asteroid(0);
-        render_asteroid(1);
-        render_asteroid(2);
-        render_asteroid(3);
-        render_asteroid(4);
-        render_asteroid(5);
-        render_asteroid(6);
-        render_asteroid(7);
+        render_healthbar();
 
         old_controller = controller;
 
