@@ -38,6 +38,20 @@ __xdata uint8_t framebuffer[HEIGHT][WIDTH];
 
 __pdata uint8_t* matrix = (__pdata uint8_t*) 0x00;
 
+uint16_t tick;
+
+uint16_t last_render_tick;
+uint16_t last_asteroid_tick;
+
+#define IN_BOUNDS(x, y) ((uint8_t) (x) < WIDTH && (uint8_t) (y) < HEIGHT)
+
+#define SET_PIXEL(x, y, color)               \
+    do {                                     \
+        if (IN_BOUNDS(x, y)) {               \
+            framebuffer[(y)][(x)] = (color); \
+        }                                    \
+    } while (0)
+
 typedef enum {
     ASTEROID_SHAPE_BIG,
     ASTEROID_SHAPE_SMALL,
@@ -45,9 +59,10 @@ typedef enum {
 } asteroid_shape_t;
 
 typedef struct {
-    uint8_t          x;
-    uint8_t          y;
+    int8_t           x;
+    int8_t           y;
     asteroid_shape_t shape;
+    bool             visible;
 } asteroid_t;
 
 typedef struct {
@@ -55,65 +70,116 @@ typedef struct {
     uint8_t y;
 } spaceship_t;
 
-typedef struct
-{
+typedef struct {
     uint8_t x;
     uint8_t y;
     bool    visible;
 } laser_t;
 
-const uint8_t asteroid_middle[4][4] = {{BLU, BLU, BLK, BLU},
-                                       {BLK, BLU, BLU, BLU},
-                                       {BLU, BLU, BLU, BLU},
-                                       {BLU, BLU, BLK, BLK}};
-
-const uint8_t asteroid_big[6][5] = {{BLK, BLU, BLK, BLU, BLK},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLU, BLU, BLU, BLU, BLU},
-                                    {BLK, BLU, BLK, BLU, BLK}};
-
-const uint8_t asteroid_small[3][3] = {{BLK, BLK, BLU},
-                                      {BLK, BLU, BLU},
-                                      {BLU, BLU, BLU}};
-
-asteroid_t a1 = {8, 8, ASTEROID_SHAPE_SMALL};
-asteroid_t a2 = {8, 8, ASTEROID_SHAPE_SMALL};
-
 spaceship_t spaceship = {3, 8};
+
+asteroid_t asteroids[8];
+uint8_t    asteroids_index = 0;
 
 laser_t laser[8];
 uint8_t laser_index = 0;
 
-void render_asteroid_shape(asteroid_t* asteroid) {
-    switch (asteroid->shape) {
+bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
+    return (x + w >= 0) && (x < WIDTH) && (y + h >= 0) && (y <= HEIGHT);
+}
+
+bool render_asteroid_shape(uint8_t index, uint8_t color) {
+    uint8_t x = asteroids[index].x;
+    uint8_t y = asteroids[index].y;
+
+    switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_SMALL: {
-            framebuffer[asteroid->y + 1][asteroid->x - 1] = BLU;
-            framebuffer[asteroid->y][asteroid->x]         = BLU;
-            framebuffer[asteroid->y + 1][asteroid->x]     = BLU;
-            framebuffer[asteroid->y - 1][asteroid->x + 1] = BLU;
-            framebuffer[asteroid->y][asteroid->x + 1]     = BLU;
-            framebuffer[asteroid->y + 1][asteroid->x + 1] = BLU;
+            if (!fits_on_screen(x, y, 3, 3)) return false;
+
+            SET_PIXEL(x + 0, y + 0, color);
+            SET_PIXEL(x + 0, y + 1, color);
+            SET_PIXEL(x + 0, y + 2, color);
+
+            SET_PIXEL(x + 1, y + 1, color);
+            SET_PIXEL(x + 1, y + 2, color);
+
+            SET_PIXEL(x + 2, y + 2, color);
             break;
         }
         case ASTEROID_SHAPE_MIDDLE: {
+            if (!fits_on_screen(x, y, 4, 4)) return false;
+
+            SET_PIXEL(x + 0, y + 2, color);
+
+            SET_PIXEL(x + 1, y + 1, color);
+            SET_PIXEL(x + 1, y + 2, color);
+            SET_PIXEL(x + 1, y + 3, color);
+
+            SET_PIXEL(x + 2, y + 0, color);
+            SET_PIXEL(x + 2, y + 1, color);
+            SET_PIXEL(x + 2, y + 2, color);
+
+            SET_PIXEL(x + 3, y + 0, color);
+            SET_PIXEL(x + 3, y + 1, color);
             break;
         }
         case ASTEROID_SHAPE_BIG: {
+            if (!fits_on_screen(x, y, 6, 5)) return false;
+
+            SET_PIXEL(x + 0, y + 1, color);
+            SET_PIXEL(x + 0, y + 2, color);
+            SET_PIXEL(x + 0, y + 3, color);
+
+            SET_PIXEL(x + 1, y + 0, color);
+            SET_PIXEL(x + 1, y + 1, color);
+            SET_PIXEL(x + 1, y + 2, color);
+            SET_PIXEL(x + 1, y + 3, color);
+
+            SET_PIXEL(x + 2, y + 0, color);
+            SET_PIXEL(x + 2, y + 1, color);
+            SET_PIXEL(x + 2, y + 2, color);
+            SET_PIXEL(x + 2, y + 3, color);
+            SET_PIXEL(x + 2, y + 4, color);
+
+            SET_PIXEL(x + 3, y + 0, color);
+            SET_PIXEL(x + 3, y + 1, color);
+            SET_PIXEL(x + 3, y + 2, color);
+            SET_PIXEL(x + 3, y + 3, color);
+            SET_PIXEL(x + 3, y + 4, color);
+
+            SET_PIXEL(x + 4, y + 1, color);
+            SET_PIXEL(x + 4, y + 2, color);
+            SET_PIXEL(x + 4, y + 3, color);
+
+            SET_PIXEL(x + 5, y + 2, color);
+            SET_PIXEL(x + 5, y + 3, color);
+
             break;
         }
     }
+
+    return true;
 }
 
-inline void render_spaceship(uint8_t color) {
+void render_asteroid(uint8_t index) {
+    if (!asteroids[index].visible) {
+        return;
+    }
+    render_asteroid_shape(index, BLK);
+    asteroids[index].x -= 1;
+    if (!render_asteroid_shape(index, BLU)) {
+        asteroids[index].visible = false;
+    }
+}
+
+void render_spaceship(uint8_t color) {
     framebuffer[spaceship.y][spaceship.x]     = color;
     framebuffer[spaceship.y][spaceship.x + 1] = color;
     framebuffer[spaceship.y - 1][spaceship.x] = color;
     framebuffer[spaceship.y + 1][spaceship.x] = color;
 }
 
-inline void render_laser(uint8_t index) {
+void render_laser(uint8_t index) {
     if (laser[index].visible) {
         framebuffer[laser[index].y][laser[index].x] = BLK;
         laser[index].x++;
@@ -123,6 +189,30 @@ inline void render_laser(uint8_t index) {
             framebuffer[laser[index].y][laser[index].x] = RED;
         }
     }
+}
+
+// Random Number Generator
+// Source: github.com/edrosten/8bit_rng
+
+typedef struct {
+    uint8_t x;
+    uint8_t y;
+    uint8_t z;
+    uint8_t a;
+} rng_t;
+
+rng_t rng = {0, 0, 0, 1};
+
+uint8_t rand() {
+    uint8_t t = rng.x ^ (rng.x << 4);
+
+    rng.x = rng.y;
+    rng.y = rng.z;
+    rng.z = rng.a;
+
+    rng.a = rng.z ^ t ^ (rng.z >> 1) ^ (t << 1);
+
+    return rng.a;
 }
 
 void msdelay(uint16_t value) {
@@ -152,19 +242,27 @@ uint8_t read_controller() {
 }
 
 void main() {
-    // timer 0 config
-    TMOD = M0_0;
-    TH0  = 0xEF;  // 2.5ms
-    TL0  = 0xB9;
+    TMOD = M0_0 | M0_1;
+
+    // timer 0
+    TH0 = 0xEF;  // 2.5ms
+    TL0 = 0xB9;
+
+    // // timer 1
+    // TH1 = 0xBE;  // 10 ms
+    // TL1 = 0xE5;
 
     // interrupt config
     EA  = 1;  // enable interrupts
     ET0 = 1;  // enable timer 0 interrupt
+    // ET1 = 1;  // enable timer 1 interrupt
+    // PT1 = 1;  // prioritize timer 1 interrupt
 
-    TR0  = 1;  // enable timer 0
+    TR0 = 1;  // enable timer 0
+    // TR1  = 1;  // enable timer 1
     P3_5 = 1;  // disable LED
 
-    P2 = 0x40;
+    P2 = 0x40;  // matrix address high byte
 
     NES_LATCH = 0;
     NES_CLK   = 0;
@@ -172,7 +270,15 @@ void main() {
     render_spaceship(WHT);
 
     while (1) {
+        if (tick - last_render_tick < 5) continue;
+
         uint8_t controller = read_controller();
+
+        if (controller & BTN_SELECT) {
+            P3_5 = 0;
+        } else {
+            P3_5 = 1;
+        }
 
         if ((controller & BTN_UP) && spaceship.y >= 2) {
             render_spaceship(BLK);
@@ -215,9 +321,30 @@ void main() {
         render_laser(6);
         render_laser(7);
 
+        if (tick - last_asteroid_tick > 200) {
+            uint8_t y                          = rand() & 0x0F;
+            asteroids[asteroids_index].y       = y;
+            asteroids[asteroids_index].x       = 31;
+            asteroids[asteroids_index].visible = true;
+            asteroids[asteroids_index].shape   = ASTEROID_SHAPE_BIG;
+            asteroids_index++;
+            if (asteroids_index >= 8) asteroids_index = 0;
+
+            last_asteroid_tick = tick;
+        }
+
+        render_asteroid(0);
+        render_asteroid(1);
+        render_asteroid(2);
+        render_asteroid(3);
+        render_asteroid(4);
+        render_asteroid(5);
+        render_asteroid(6);
+        render_asteroid(7);
+
         old_controller = controller;
 
-        msdelay(20);
+        last_render_tick = tick;
     }
 }
 
@@ -234,7 +361,6 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     // restart timer 0
     TH0 = 0xEF;  // 2.5ms
     TL0 = 0xB9;
-    TR0 = 1;
 
     // prepare matrix cmd to write line
     cmd = line | 0x8;
@@ -243,7 +369,7 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     m_ptr = matrix;
     f_ptr = framebuffer;
 
-    P3_5 = 1;
+    // P3_5 = 1;
 
     // shift framebuffer pointer to the currently scanned line
     f_ptr += (line << 5);
@@ -299,7 +425,9 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     line++;
     if (line >= 8) line = 0;
 
-    P3_5 = 0;
+    if (line == 0 || line == 3) tick++;
+
+    // P3_5 = 0;
 }
 
 void timer1() __interrupt(TF1_VECTOR) __using(0) {
