@@ -22,44 +22,40 @@
 #define BTN_B 0x40
 #define BTN_A 0x80
 
-uint8_t old_controller = 0;
-
+// Colors
 #define BLK (0x00)
 #define WHT (0x3F)
-
 #define RED (0x30)
 #define GRN (0x0C)
 #define BLU (0x03)
-
 #define YEL (0x3C)
 #define MAG (0x33)
 #define CYN (0x0F)
-
 #define ORG (0x38)
-
 #define RED_LIGHT (0x10)
 
+// LED Matrix Pixel Size
 #define WIDTH 32
 #define HEIGHT 16
 
-// Array for external Matrix
+// Pixel Buffer for Matrix LED Display
 __xdata uint8_t framebuffer[HEIGHT][WIDTH];
 
+// Pointer to external LED Matrix
+// highest address is 16*7+8 = 120, so 8-bit addressing mode is sufficient
 __pdata uint8_t* matrix = (__pdata uint8_t*) 0x00;
 
+// tick counter for game code timings (one tick every 10 ms)
 uint16_t tick;
 
-uint16_t last_render_tick;
-uint16_t last_asteroid_tick;
-
+// checks if a pixel is within the frame buffer
 #define IN_BOUNDS(x, y) ((uint8_t) (x) < WIDTH && (uint8_t) (y) < HEIGHT)
 
-#define SET_PIXEL(x, y, color)               \
-    do {                                     \
-        if (IN_BOUNDS(x, y)) {               \
-            framebuffer[(y)][(x)] = (color); \
-        }                                    \
-    } while (0)
+// set a pixel in the framebuffer with bounds check
+#define SET_PIXEL(x, y, color)           \
+    if (IN_BOUNDS(x, y)) {               \
+        framebuffer[(y)][(x)] = (color); \
+    }
 
 typedef enum {
     ASTEROID_SHAPE_BIG,
@@ -75,11 +71,16 @@ typedef struct {
     uint8_t          hp;
 } asteroid_t;
 
+asteroid_t asteroids[8];
+uint8_t    asteroids_index = 0;
+
 typedef struct {
     uint8_t x;
     uint8_t y;
     uint8_t hp;
 } spaceship_t;
+
+spaceship_t spaceship = {3, 8, 8};
 
 typedef struct {
     uint8_t x;
@@ -87,15 +88,10 @@ typedef struct {
     bool    visible;
 } laser_t;
 
-spaceship_t spaceship = {3, 8, 8};
-
-asteroid_t asteroids[8];
-uint8_t    asteroids_index = 0;
-
 laser_t laser[8];
 uint8_t laser_index = 0;
 
-void spaceship_hit(uint8_t index) {
+inline void spaceship_hit(uint8_t index) {
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_BIG: {
             spaceship.hp -= 4;
@@ -112,7 +108,7 @@ void spaceship_hit(uint8_t index) {
     }
 }
 
-bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
+inline bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
     return (x + w >= 0) && (x < WIDTH) && (y + h >= 0) && (y <= HEIGHT);
 }
 
@@ -248,6 +244,7 @@ void render_asteroid(uint8_t index) {
 
     switch (render_asteroid_shape(index, color)) {
         case RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE: {
+            asteroids[index].visible = false;
             break;
         };
         case RENDER_ASTEROID_SHAPE_RETURN_HITSHIP: {
@@ -312,7 +309,7 @@ void render_laser(uint8_t index) {
     }
 
     if (framebuffer[laser[index].y][laser[index].x] != BLK) {
-        // hit!
+        // we know we hit something, but we need to find the exact asteroid we hit
         if (asteroid_hit(0, laser[index].x, laser[index].y)) {
         } else if (asteroid_hit(1, laser[index].x, laser[index].y)) {
         } else if (asteroid_hit(2, laser[index].x, laser[index].y)) {
@@ -359,6 +356,13 @@ typedef struct {
 
 rng_t rng = {0, 0, 0, 1};
 
+void seed(uint8_t seed) {
+    rng.x = seed;
+    rng.y = seed ^ 0xA5;
+    rng.z = (seed << 1) | (seed >> 7);
+    rng.a = seed | 1;  // ensure non-zero
+}
+
 uint8_t rand() {
     uint8_t t = rng.x ^ (rng.x << 4);
 
@@ -371,26 +375,28 @@ uint8_t rand() {
     return rng.a;
 }
 
-void msdelay(uint16_t value) {
-    for (uint16_t x = 0; x < value; x++) {
-        for (uint8_t y = 0; y < 200; y++);
-    }
-}
-
+// Reads NES controller inputs and returns button states as 8-bit bitmask
 uint8_t read_controller() {
     uint8_t value = 0;
 
+    // Pulse Latch to sample buttons states in shift register
     NES_LATCH = 1;
     NES_LATCH = 0;
 
+    // Read first button (active low)
     value = (NES_DATA == 0);
 
+    // Loop remaining 7 buttons
     uint8_t i = 7;
     do {
+        // Pulse clock to shift the next bit out
         NES_CLK = 1;
         NES_CLK = 0;
 
+        // Make room for the next bit
         value <<= 1;
+
+        // Read next button and store bit (active low)
         value |= (NES_DATA == 0);
     } while (--i > 0);
 
@@ -426,9 +432,11 @@ void main() {
     render_spaceship(WHT);
 
     while (1) {
+        static uint16_t last_render_tick = 0;
         if (tick - last_render_tick < 5) continue;
 
-        uint8_t controller = read_controller();
+        static uint8_t old_controller = 0;
+        uint8_t        controller     = read_controller();
 
         if ((controller & BTN_UP) && spaceship.y >= 2) {
             spaceship.y -= 1;
@@ -453,6 +461,7 @@ void main() {
             render_spaceship(WHT);
         }
 
+        static uint16_t last_asteroid_tick = 0;
         if (tick - last_asteroid_tick > 200) {
             int8_t y     = rand() & 0x0F;
             int8_t shape = rand() & 0x03;
