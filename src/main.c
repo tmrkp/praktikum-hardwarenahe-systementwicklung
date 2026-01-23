@@ -12,6 +12,9 @@
 #define NES_LATCH P1_0
 #define NES_DATA P1_1
 
+// Debug LED
+#define LED P3_5
+
 // Button bitmapping for NES controller
 #define BTN_RIGHT 0x01
 #define BTN_LEFT 0x02
@@ -57,154 +60,81 @@ uint16_t tick;
         framebuffer[(y)][(x)] = (color); \
     }
 
-void render_font_G(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
-    framebuffer[y][x + 3] = color;
+#define FONT_H 5
+#define FONT_W 5
 
-    framebuffer[y + 1][x] = color;
+const uint8_t font_A[] = {
+    0b01100,
+    0b10010,
+    0b11110,
+    0b10010,
+    0b10010};
 
-    framebuffer[y + 2][x]     = color;
-    framebuffer[y + 2][x + 2] = color;
-    framebuffer[y + 2][x + 3] = color;
+const uint8_t font_E[] = {
+    0b11110,
+    0b10000,
+    0b11100,
+    0b10000,
+    0b11110};
 
-    framebuffer[y + 3][x]     = color;
-    framebuffer[y + 3][x + 3] = color;
+const uint8_t font_G[] = {
+    0b01110,
+    0b10000,
+    0b10110,
+    0b10010,
+    0b01110};
 
-    framebuffer[y + 4][x + 1] = color;
-    framebuffer[y + 4][x + 2] = color;
-    framebuffer[y + 4][x + 3] = color;
-}
+const uint8_t font_M[] = {
+    0b10001,
+    0b11011,
+    0b10101,
+    0b10001,
+    0b10001};
 
-void render_font_A(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
+const uint8_t font_O[] = {
+    0b01110,
+    0b10001,
+    0b10001,
+    0b10001,
+    0b01110};
 
-    framebuffer[y + 1][x]     = color;
-    framebuffer[y + 1][x + 3] = color;
+const uint8_t font_R[] = {
+    0b11100,
+    0b10010,
+    0b11100,
+    0b10100,
+    0b10010};
 
-    framebuffer[y + 2][x]     = color;
-    framebuffer[y + 2][x + 1] = color;
-    framebuffer[y + 2][x + 2] = color;
-    framebuffer[y + 2][x + 3] = color;
+const uint8_t font_S[] = {
+    0b01110,
+    0b10000,
+    0b01100,
+    0b00010,
+    0b11100};
 
-    framebuffer[y + 3][x]     = color;
-    framebuffer[y + 3][x + 3] = color;
+const uint8_t font_T[] = {
+    0b11100,
+    0b01000,
+    0b01000,
+    0b01000,
+    0b01000};
 
-    framebuffer[y + 4][x]     = color;
-    framebuffer[y + 4][x + 3] = color;
-}
+const uint8_t font_V[] = {
+    0b10100,
+    0b10100,
+    0b10100,
+    0b01000,
+    0b01000};
 
-void render_font_E(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x]     = color;
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
-    framebuffer[y][x + 3] = color;
-
-    framebuffer[y + 1][x] = color;
-
-    framebuffer[y + 2][x]     = color;
-    framebuffer[y + 2][x + 1] = color;
-    framebuffer[y + 2][x + 2] = color;
-
-    framebuffer[y + 3][x] = color;
-
-    framebuffer[y + 4][x]     = color;
-    framebuffer[y + 4][x + 1] = color;
-    framebuffer[y + 4][x + 2] = color;
-    framebuffer[y + 4][x + 3] = color;
-}
-
-void render_font_M(uint8_t x, uint8_t y, uint8_t color) {
-    for (int i = 0; i < 5; i++) {
-        framebuffer[y + i][x]     = color;
-        framebuffer[y + i][x + 4] = color;
+void render_font(const uint8_t* glyph, uint8_t x, uint8_t y, uint8_t color) {
+    for (uint8_t row = 0; row < FONT_H; row++) {
+        uint8_t bits = glyph[row];
+        for (uint8_t col = 0; col < FONT_W; col++) {
+            if (bits & (1 << (FONT_W - 1 - col))) {
+                framebuffer[y + row][x + col] = color;
+            }
+        }
     }
-
-    framebuffer[y + 1][x + 1] = color;
-    framebuffer[y + 2][x + 2] = color;
-    framebuffer[y + 1][x + 3] = color;
-}
-
-void render_font_O(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
-
-    framebuffer[y + 1][x]     = color;
-    framebuffer[y + 1][x + 3] = color;
-
-    framebuffer[y + 2][x]     = color;
-    framebuffer[y + 2][x + 3] = color;
-
-    framebuffer[y + 3][x]     = color;
-    framebuffer[y + 3][x + 3] = color;
-
-    framebuffer[y + 4][x + 1] = color;
-    framebuffer[y + 4][x + 2] = color;
-}
-
-void render_font_P(uint8_t x, uint8_t y, uint8_t color) {
-    for (int i = 0; i < 5; i++)
-        framebuffer[y + i][x] = color;
-
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
-
-    framebuffer[y + 1][x + 3] = color;
-
-    framebuffer[y + 2][x + 1] = color;
-    framebuffer[y + 2][x + 2] = color;
-}
-
-void render_font_R(uint8_t x, uint8_t y, uint8_t color) {
-    render_font_P(x, y, color);
-    framebuffer[y + 3][x + 3] = color;
-    framebuffer[y + 4][x + 3] = color;
-}
-
-void render_font_S(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
-    framebuffer[y][x + 3] = color;
-
-    framebuffer[y + 1][x] = color;
-
-    framebuffer[y + 2][x + 1] = color;
-    framebuffer[y + 2][x + 2] = color;
-
-    framebuffer[y + 3][x + 3] = color;
-
-    framebuffer[y + 4][x]     = color;
-    framebuffer[y + 4][x + 1] = color;
-    framebuffer[y + 4][x + 2] = color;
-}
-
-void render_font_T(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x]     = color;
-    framebuffer[y][x + 1] = color;
-    framebuffer[y][x + 2] = color;
-
-    framebuffer[y + 1][x + 1] = color;
-
-    framebuffer[y + 1][x + 2] = color;
-
-    framebuffer[y + 1][x + 3] = color;
-
-    framebuffer[y + 1][x + 4] = color;
-}
-
-void render_font_V(uint8_t x, uint8_t y, uint8_t color) {
-    framebuffer[y][x]     = color;
-    framebuffer[y][x + 2] = color;
-
-    framebuffer[y + 1][x]     = color;
-    framebuffer[y + 1][x + 2] = color;
-
-    framebuffer[y + 2][x]     = color;
-    framebuffer[y + 2][x + 2] = color;
-
-    framebuffer[y + 3][x + 1] = color;
-    framebuffer[y + 4][x + 1] = color;
 }
 
 inline bool intersect_area(uint8_t x1, uint8_t y1, uint8_t w1, uint8_t h1,
@@ -215,16 +145,26 @@ inline bool intersect_area(uint8_t x1, uint8_t y1, uint8_t w1, uint8_t h1,
            x2 <= x1 + w1;
 }
 
+void clear_screen() {
+    for (uint8_t x = 0; x < WIDTH; x++) {
+        for (uint8_t y = 0; y < HEIGHT; y++) {
+            framebuffer[y][x] = BLK;
+        }
+    }
+}
+
 typedef enum {
+    GAME_STATE_DRAW_START,
     GAME_STATE_START,
     GAME_STATE_INGAME,
+    GAME_STATE_DRAW_GAMEOVER,
     GAME_STATE_GAMEOVER,
 } game_state_t;
 
-game_state_t state = GAME_STATE_START;
+game_state_t state = GAME_STATE_DRAW_START;
 
 typedef enum {
-    ASTEROID_SHAPE_BIG,
+    ASTEROID_SHAPE_BIG = 0,
     ASTEROID_SHAPE_SMALL,
     ASTEROID_SHAPE_MIDDLE,
 } asteroid_shape_t;
@@ -246,7 +186,7 @@ typedef struct {
     uint8_t hp;
 } spaceship_t;
 
-spaceship_t spaceship = {3, 8, 8};
+spaceship_t spaceship;
 
 typedef struct {
     uint8_t x;
@@ -257,12 +197,33 @@ typedef struct {
 laser_t laser[8];
 uint8_t laser_index = 0;
 
+void game_reset() {
+    spaceship.x  = 3;
+    spaceship.y  = 8;
+    spaceship.hp = 16;
+
+    for (uint8_t i = 0; i < 8; i++) {
+        asteroids[i].visible = false;
+    }
+
+    asteroids_index = 0;
+
+    for (uint8_t i = 0; i < 8; i++) {
+        laser[i].visible = false;
+    }
+
+    laser_index = 0;
+}
+
 bool spaceship_hit(uint8_t index) {
+    if (!asteroids[index].visible) {
+        return false;
+    }
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_BIG: {
             if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 6, 5)) {
                 if (spaceship.hp <= 2) {
-                    state = GAME_STATE_GAMEOVER;
+                    state = GAME_STATE_DRAW_GAMEOVER;
                     return true;
                 };
                 spaceship.hp -= 2;
@@ -273,7 +234,7 @@ bool spaceship_hit(uint8_t index) {
         case ASTEROID_SHAPE_MIDDLE: {
             if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 4, 4)) {
                 if (spaceship.hp <= 1) {
-                    state = GAME_STATE_GAMEOVER;
+                    state = GAME_STATE_DRAW_GAMEOVER;
                     return true;
                 };
                 spaceship.hp -= 1;
@@ -284,7 +245,7 @@ bool spaceship_hit(uint8_t index) {
         case ASTEROID_SHAPE_SMALL: {
             if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 3, 3)) {
                 if (spaceship.hp <= 1) {
-                    state = GAME_STATE_GAMEOVER;
+                    state = GAME_STATE_DRAW_GAMEOVER;
                     return true;
                 };
                 spaceship.hp -= 1;
@@ -630,63 +591,65 @@ void main() {
 
     TR0 = 1;  // enable timer 0
     // TR1  = 1;  // enable timer 1
-    P3_5 = 1;  // disable LED
+    LED = 1;  // disable LED
 
     P2 = 0x40;  // matrix address high byte
 
     NES_LATCH = 0;
     NES_CLK   = 0;
 
-    render_spaceship();
-
     while (1) {
+        static uint16_t last_render_tick = 0;
+        if (tick - last_render_tick < 5) continue;
+
+        static uint8_t last_controller = 0;
+        uint8_t        controller      = read_controller();
+
         switch (state) {
+            case GAME_STATE_DRAW_START: {
+                clear_screen();
+
+                render_font(font_S, 5, 2, GRN);
+                render_font(font_T, 10, 2, GRN);
+                render_font(font_A, 14, 2, GRN);
+                render_font(font_R, 19, 2, GRN);
+                render_font(font_T, 24, 2, GRN);
+
+                render_font(font_G, 6, 9, GRN);
+                render_font(font_A, 11, 9, GRN);
+                render_font(font_M, 16, 9, GRN);
+                render_font(font_E, 22, 9, GRN);
+
+                state = GAME_STATE_START;
+                break;
+            }
             case GAME_STATE_START: {
-                uint8_t controller = read_controller();
-
-                render_font_S(5, 2, GRN);
-                render_font_T(10, 2, GRN);
-                render_font_A(14, 2, GRN);
-                render_font_R(19, 2, GRN);
-                render_font_T(24, 2, GRN);
-
-                render_font_G(6, 9, GRN);
-                render_font_A(11, 9, GRN);
-                render_font_M(16, 9, GRN);
-                render_font_E(22, 9, GRN);
-
-                if (controller & BTN_SELECT) state = GAME_STATE_INGAME;
+                if ((controller & BTN_START) && !(last_controller & BTN_START)) {
+                    clear_screen();
+                    game_reset();
+                    state = GAME_STATE_INGAME;
+                }
                 break;
             }
             case GAME_STATE_INGAME: {
-                static uint16_t last_render_tick = 0;
-                if (tick - last_render_tick < 5) return;
-
-                static uint8_t old_controller = 0;
-                uint8_t        controller     = read_controller();
-
                 if ((controller & BTN_UP) && spaceship.y >= 2) {
                     clear_spaceship();
                     spaceship.y -= 1;
-                    render_spaceship();
                 }
 
                 if ((controller & BTN_DOWN) && spaceship.y <= 13) {
                     clear_spaceship();
                     spaceship.y += 1;
-                    render_spaceship();
                 }
 
                 if ((controller & BTN_RIGHT) && spaceship.x <= 29) {
                     clear_spaceship();
                     spaceship.x += 1;
-                    render_spaceship();
                 }
 
                 if ((controller & BTN_LEFT) && spaceship.x >= 1) {
                     clear_spaceship();
                     spaceship.x -= 1;
-                    render_spaceship();
                 }
 
                 static uint16_t last_asteroid_tick = 0;
@@ -714,7 +677,7 @@ void main() {
                 render_asteroid(6);
                 render_asteroid(7);
 
-                if ((controller & BTN_A) && !(old_controller & BTN_A)) {
+                if ((controller & BTN_A) && !(last_controller & BTN_A)) {
                     laser[laser_index].x       = spaceship.x + 2;
                     laser[laser_index].y       = spaceship.y;
                     laser[laser_index].visible = true;
@@ -734,31 +697,36 @@ void main() {
                 render_healthbar();
                 render_spaceship();
 
-                old_controller = controller;
+                break;
+            }
+            case GAME_STATE_DRAW_GAMEOVER: {
+                clear_screen();
 
-                last_render_tick = tick;
+                render_font(font_G, 6, 2, RED);
+                render_font(font_A, 11, 2, RED);
+                render_font(font_M, 16, 2, RED);
+                render_font(font_E, 22, 2, RED);
+
+                render_font(font_O, 7, 9, RED);
+                render_font(font_V, 12, 9, RED);
+                render_font(font_E, 16, 9, RED);
+                render_font(font_R, 21, 9, RED);
+
+                state = GAME_STATE_GAMEOVER;
                 break;
             }
             case GAME_STATE_GAMEOVER: {
-                for (uint8_t x = 0; x < WIDTH; x++) {
-                    for (uint8_t y = 0; y < HEIGHT; y++) {
-                        framebuffer[x][y] = BLK;
-                    }
+                if ((controller & BTN_START) && !(last_controller & BTN_START)) {
+                    clear_screen();
+                    state = GAME_STATE_DRAW_START;
                 }
-
-                render_font_G(6, 2, RED);
-                render_font_A(11, 2, RED);
-                render_font_M(16, 2, RED);
-                render_font_E(22, 2, RED);
-
-                render_font_O(7, 9, RED);
-                render_font_V(12, 9, RED);
-                render_font_E(16, 9, RED);
-                render_font_R(21, 9, RED);
 
                 break;
             }
         }
+
+        last_controller  = controller;
+        last_render_tick = tick;
     }
 }
 
@@ -783,7 +751,7 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     m_ptr = matrix;
     f_ptr = framebuffer;
 
-    // P3_5 = 1;
+    // LED = 1;
 
     // shift framebuffer pointer to the currently scanned line
     f_ptr += (line << 5);
@@ -841,7 +809,7 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
 
     if (line == 0 || line == 3) tick++;
 
-    // P3_5 = 0;
+    // LED = 0;
 }
 
 void timer1() __interrupt(TF1_VECTOR) __using(0) {
