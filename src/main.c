@@ -57,6 +57,156 @@ uint16_t tick;
         framebuffer[(y)][(x)] = (color); \
     }
 
+void render_font_G(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+    framebuffer[y][x + 3] = color;
+
+    framebuffer[y + 1][x] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 2] = color;
+    framebuffer[y + 2][x + 3] = color;
+
+    framebuffer[y + 3][x]     = color;
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_A(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x]     = color;
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+    framebuffer[y + 2][x + 3] = color;
+
+    framebuffer[y + 3][x]     = color;
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x]     = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_E(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x]     = color;
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+    framebuffer[y][x + 3] = color;
+
+    framebuffer[y + 1][x] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+
+    framebuffer[y + 3][x] = color;
+
+    framebuffer[y + 4][x]     = color;
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_M(uint8_t x, uint8_t y, uint8_t color) {
+    for (int i = 0; i < 5; i++) {
+        framebuffer[y + i][x]     = color;
+        framebuffer[y + i][x + 4] = color;
+    }
+
+    framebuffer[y + 1][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+    framebuffer[y + 1][x + 3] = color;
+}
+
+void render_font_O(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x]     = color;
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 3] = color;
+
+    framebuffer[y + 3][x]     = color;
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+}
+
+void render_font_P(uint8_t x, uint8_t y, uint8_t color) {
+    for (int i = 0; i < 5; i++)
+        framebuffer[y + i][x] = color;
+
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+}
+
+void render_font_R(uint8_t x, uint8_t y, uint8_t color) {
+    render_font_P(x, y, color);
+    framebuffer[y + 3][x + 3] = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_S(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+    framebuffer[y][x + 3] = color;
+
+    framebuffer[y + 1][x] = color;
+
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x]     = color;
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+}
+
+void render_font_T(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x]     = color;
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x + 1] = color;
+
+    framebuffer[y + 1][x + 2] = color;
+
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 1][x + 4] = color;
+}
+
+void render_font_V(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x]     = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x]     = color;
+    framebuffer[y + 1][x + 2] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 2] = color;
+
+    framebuffer[y + 3][x + 1] = color;
+    framebuffer[y + 4][x + 1] = color;
+}
+
 typedef enum {
     ASTEROID_SHAPE_BIG,
     ASTEROID_SHAPE_SMALL,
