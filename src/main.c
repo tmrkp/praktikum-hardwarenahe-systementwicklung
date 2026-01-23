@@ -57,6 +57,156 @@ uint16_t tick;
         framebuffer[(y)][(x)] = (color); \
     }
 
+void render_font_G(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+    framebuffer[y][x + 3] = color;
+
+    framebuffer[y + 1][x] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 2] = color;
+    framebuffer[y + 2][x + 3] = color;
+
+    framebuffer[y + 3][x]     = color;
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_A(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x]     = color;
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+    framebuffer[y + 2][x + 3] = color;
+
+    framebuffer[y + 3][x]     = color;
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x]     = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_E(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x]     = color;
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+    framebuffer[y][x + 3] = color;
+
+    framebuffer[y + 1][x] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+
+    framebuffer[y + 3][x] = color;
+
+    framebuffer[y + 4][x]     = color;
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_M(uint8_t x, uint8_t y, uint8_t color) {
+    for (int i = 0; i < 5; i++) {
+        framebuffer[y + i][x]     = color;
+        framebuffer[y + i][x + 4] = color;
+    }
+
+    framebuffer[y + 1][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+    framebuffer[y + 1][x + 3] = color;
+}
+
+void render_font_O(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x]     = color;
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 3] = color;
+
+    framebuffer[y + 3][x]     = color;
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+}
+
+void render_font_P(uint8_t x, uint8_t y, uint8_t color) {
+    for (int i = 0; i < 5; i++)
+        framebuffer[y + i][x] = color;
+
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+}
+
+void render_font_R(uint8_t x, uint8_t y, uint8_t color) {
+    render_font_P(x, y, color);
+    framebuffer[y + 3][x + 3] = color;
+    framebuffer[y + 4][x + 3] = color;
+}
+
+void render_font_S(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+    framebuffer[y][x + 3] = color;
+
+    framebuffer[y + 1][x] = color;
+
+    framebuffer[y + 2][x + 1] = color;
+    framebuffer[y + 2][x + 2] = color;
+
+    framebuffer[y + 3][x + 3] = color;
+
+    framebuffer[y + 4][x]     = color;
+    framebuffer[y + 4][x + 1] = color;
+    framebuffer[y + 4][x + 2] = color;
+}
+
+void render_font_T(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x]     = color;
+    framebuffer[y][x + 1] = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x + 1] = color;
+
+    framebuffer[y + 1][x + 2] = color;
+
+    framebuffer[y + 1][x + 3] = color;
+
+    framebuffer[y + 1][x + 4] = color;
+}
+
+void render_font_V(uint8_t x, uint8_t y, uint8_t color) {
+    framebuffer[y][x]     = color;
+    framebuffer[y][x + 2] = color;
+
+    framebuffer[y + 1][x]     = color;
+    framebuffer[y + 1][x + 2] = color;
+
+    framebuffer[y + 2][x]     = color;
+    framebuffer[y + 2][x + 2] = color;
+
+    framebuffer[y + 3][x + 1] = color;
+    framebuffer[y + 4][x + 1] = color;
+}
+
 inline bool intersect_area(uint8_t x1, uint8_t y1, uint8_t w1, uint8_t h1,
                            uint8_t x2, uint8_t y2, uint8_t w2, uint8_t h2) {
     return y2 + h2 >= y1 &&
@@ -107,26 +257,12 @@ typedef struct {
 laser_t laser[8];
 uint8_t laser_index = 0;
 
-inline void render_game_over() {
-    for (uint8_t x = 0; x < WIDTH; x++) {
-        for (uint8_t y = 0; y < HEIGHT; y++) {
-            framebuffer[y][x] = BLK;
-        }
-    }
-}
-
-inline void render_game() {
-}
-
-inline void render_game_over() {
-}
-
 bool spaceship_hit(uint8_t index) {
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_BIG: {
             if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 6, 5)) {
                 if (spaceship.hp <= 2) {
-                    game_over();
+                    state = GAME_STATE_GAMEOVER;
                     return true;
                 };
                 spaceship.hp -= 2;
@@ -137,7 +273,7 @@ bool spaceship_hit(uint8_t index) {
         case ASTEROID_SHAPE_MIDDLE: {
             if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 4, 4)) {
                 if (spaceship.hp <= 1) {
-                    game_over();
+                    state = GAME_STATE_GAMEOVER;
                     return true;
                 };
                 spaceship.hp -= 1;
@@ -148,7 +284,7 @@ bool spaceship_hit(uint8_t index) {
         case ASTEROID_SHAPE_SMALL: {
             if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 3, 3)) {
                 if (spaceship.hp <= 1) {
-                    game_over();
+                    state = GAME_STATE_GAMEOVER;
                     return true;
                 };
                 spaceship.hp -= 1;
@@ -505,97 +641,124 @@ void main() {
 
     while (1) {
         switch (state) {
-            case GAME_STATE_START:
-                render_start_game();
+            case GAME_STATE_START: {
+                uint8_t controller = read_controller();
+
+                render_font_S(5, 2, GRN);
+                render_font_T(10, 2, GRN);
+                render_font_A(14, 2, GRN);
+                render_font_R(19, 2, GRN);
+                render_font_T(24, 2, GRN);
+
+                render_font_G(6, 9, GRN);
+                render_font_A(11, 9, GRN);
+                render_font_M(16, 9, GRN);
+                render_font_E(22, 9, GRN);
+
+                if (controller & BTN_SELECT) state = GAME_STATE_INGAME;
                 break;
-            case GAME_STATE_INGAME:
-                render_game();
+            }
+            case GAME_STATE_INGAME: {
+                static uint16_t last_render_tick = 0;
+                if (tick - last_render_tick < 5) return;
+
+                static uint8_t old_controller = 0;
+                uint8_t        controller     = read_controller();
+
+                if ((controller & BTN_UP) && spaceship.y >= 2) {
+                    clear_spaceship();
+                    spaceship.y -= 1;
+                    render_spaceship();
+                }
+
+                if ((controller & BTN_DOWN) && spaceship.y <= 13) {
+                    clear_spaceship();
+                    spaceship.y += 1;
+                    render_spaceship();
+                }
+
+                if ((controller & BTN_RIGHT) && spaceship.x <= 29) {
+                    clear_spaceship();
+                    spaceship.x += 1;
+                    render_spaceship();
+                }
+
+                if ((controller & BTN_LEFT) && spaceship.x >= 1) {
+                    clear_spaceship();
+                    spaceship.x -= 1;
+                    render_spaceship();
+                }
+
+                static uint16_t last_asteroid_tick = 0;
+                if (tick - last_asteroid_tick > 200) {
+                    int8_t y     = rand() & 0x0F;
+                    int8_t shape = rand() & 0x03;
+                    if (shape == 3) shape = 1;
+                    asteroids[asteroids_index].y       = y - 2;
+                    asteroids[asteroids_index].x       = 31;
+                    asteroids[asteroids_index].visible = true;
+                    asteroids[asteroids_index].shape   = shape;
+                    asteroids[asteroids_index].hp      = 3;
+                    asteroids_index++;
+                    if (asteroids_index >= 8) asteroids_index = 0;
+
+                    last_asteroid_tick = tick;
+                }
+
+                render_asteroid(0);
+                render_asteroid(1);
+                render_asteroid(2);
+                render_asteroid(3);
+                render_asteroid(4);
+                render_asteroid(5);
+                render_asteroid(6);
+                render_asteroid(7);
+
+                if ((controller & BTN_A) && !(old_controller & BTN_A)) {
+                    laser[laser_index].x       = spaceship.x + 2;
+                    laser[laser_index].y       = spaceship.y;
+                    laser[laser_index].visible = true;
+                    laser_index++;
+                    if (laser_index >= 8) laser_index = 0;
+                }
+
+                render_laser(0);
+                render_laser(1);
+                render_laser(2);
+                render_laser(3);
+                render_laser(4);
+                render_laser(5);
+                render_laser(6);
+                render_laser(7);
+
+                render_healthbar();
+                render_spaceship();
+
+                old_controller = controller;
+
+                last_render_tick = tick;
                 break;
-            case GAME_STATE_GAMEOVER:
-                game_over();
+            }
+            case GAME_STATE_GAMEOVER: {
+                for (uint8_t x = 0; x < WIDTH; x++) {
+                    for (uint8_t y = 0; y < HEIGHT; y++) {
+                        framebuffer[x][y] = BLK;
+                    }
+                }
+
+                render_font_G(6, 2, RED);
+                render_font_A(11, 2, RED);
+                render_font_M(16, 2, RED);
+                render_font_E(22, 2, RED);
+
+                render_font_O(7, 9, RED);
+                render_font_V(12, 9, RED);
+                render_font_E(16, 9, RED);
+                render_font_R(21, 9, RED);
+
                 break;
+            }
         }
-    }
-
-    while (1) {
-        static uint16_t last_render_tick = 0;
-        if (tick - last_render_tick < 5) continue;
-
-        static uint8_t old_controller = 0;
-        uint8_t        controller     = read_controller();
-
-        if ((controller & BTN_UP) && spaceship.y >= 2) {
-            clear_spaceship();
-            spaceship.y -= 1;
-            render_spaceship();
-        }
-
-        if ((controller & BTN_DOWN) && spaceship.y <= 13) {
-            clear_spaceship();
-            spaceship.y += 1;
-            render_spaceship();
-        }
-
-        if ((controller & BTN_RIGHT) && spaceship.x <= 29) {
-            clear_spaceship();
-            spaceship.x += 1;
-            render_spaceship();
-        }
-
-        if ((controller & BTN_LEFT) && spaceship.x >= 1) {
-            clear_spaceship();
-            spaceship.x -= 1;
-            render_spaceship();
-        }
-
-        static uint16_t last_asteroid_tick = 0;
-        if (tick - last_asteroid_tick > 200) {
-            int8_t y     = rand() & 0x0F;
-            int8_t shape = rand() & 0x03;
-            if (shape == 3) shape = 1;
-            asteroids[asteroids_index].y       = y - 2;
-            asteroids[asteroids_index].x       = 31;
-            asteroids[asteroids_index].visible = true;
-            asteroids[asteroids_index].shape   = shape;
-            asteroids[asteroids_index].hp      = 3;
-            asteroids_index++;
-            if (asteroids_index >= 8) asteroids_index = 0;
-
-            last_asteroid_tick = tick;
-        }
-
-        render_asteroid(0);
-        render_asteroid(1);
-        render_asteroid(2);
-        render_asteroid(3);
-        render_asteroid(4);
-        render_asteroid(5);
-        render_asteroid(6);
-        render_asteroid(7);
-
-        if ((controller & BTN_A) && !(old_controller & BTN_A)) {
-            laser[laser_index].x       = spaceship.x + 2;
-            laser[laser_index].y       = spaceship.y;
-            laser[laser_index].visible = true;
-            laser_index++;
-            if (laser_index >= 8) laser_index = 0;
-        }
-
-        render_laser(0);
-        render_laser(1);
-        render_laser(2);
-        render_laser(3);
-        render_laser(4);
-        render_laser(5);
-        render_laser(6);
-        render_laser(7);
-
-        render_healthbar();
-        render_spaceship();
-
-        old_controller = controller;
-
-        last_render_tick = tick;
     }
 }
 
