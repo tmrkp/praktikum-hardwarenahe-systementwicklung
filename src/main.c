@@ -60,6 +60,10 @@ uint16_t tick;
         framebuffer[(y)][(x)] = (color); \
     }
 
+#define INTERSECT_AREA(x1, y1, w1, h1, x2, y2, w2, h2) (y2 + h2 >= y1 && y2 < y1 + h1 && x2 + w2 >= x1 && x2 < x1 + w1)
+
+#define INTERSECT_POINT(x1, y1, w1, h1, x2, y2) (x2 >= x1 && x2 < x1 + w1 && y2 >= y1 && y2 < y1 + h1)
+
 #define FONT_H 5
 #define FONT_W 5
 
@@ -135,14 +139,6 @@ void render_font(const uint8_t* glyph, uint8_t x, uint8_t y, uint8_t color) {
             }
         }
     }
-}
-
-inline bool intersect_area(uint8_t x1, uint8_t y1, uint8_t w1, uint8_t h1,
-                           uint8_t x2, uint8_t y2, uint8_t w2, uint8_t h2) {
-    return y2 + h2 >= y1 &&
-           y2 <= y1 + h1 &&
-           x2 + w2 >= x1 &&
-           x2 <= x1 + w1;
 }
 
 void clear_screen() {
@@ -221,7 +217,7 @@ bool spaceship_hit(uint8_t index) {
     }
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_BIG: {
-            if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 6, 5)) {
+            if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 6, 5)) {
                 if (spaceship.hp <= 2) {
                     state = GAME_STATE_DRAW_GAMEOVER;
                     return true;
@@ -232,7 +228,7 @@ bool spaceship_hit(uint8_t index) {
             break;
         }
         case ASTEROID_SHAPE_MIDDLE: {
-            if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 4, 4)) {
+            if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 4, 4)) {
                 if (spaceship.hp <= 1) {
                     state = GAME_STATE_DRAW_GAMEOVER;
                     return true;
@@ -243,7 +239,7 @@ bool spaceship_hit(uint8_t index) {
             break;
         }
         case ASTEROID_SHAPE_SMALL: {
-            if (intersect_area(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 3, 3)) {
+            if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 3, 3)) {
                 if (spaceship.hp <= 1) {
                     state = GAME_STATE_DRAW_GAMEOVER;
                     return true;
@@ -261,12 +257,6 @@ inline bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
     return (x + w >= 0) && (x < WIDTH) && (y + h >= 0) && (y <= HEIGHT);
 }
 
-// typedef enum {
-//     RENDER_ASTEROID_SHAPE_RETURN_NOTHING = 0,
-//     RENDER_ASTEROID_SHAPE_RETURN_NOTVISIBLE,
-//     RENDER_ASTEROID_SHAPE_RETURN_HITSHIP
-// } render_asteroid_shape_return_t;
-
 bool render_asteroid_shape(uint8_t index, uint8_t color) {
     uint8_t x = asteroids[index].x;
     uint8_t y = asteroids[index].y;
@@ -274,12 +264,6 @@ bool render_asteroid_shape(uint8_t index, uint8_t color) {
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_SMALL: {
             if (!fits_on_screen(x, y, 3, 3)) return true;
-
-            // if (framebuffer[y + 0][x + 0] == WHT ||
-            //     framebuffer[y + 1][x + 0] == WHT ||
-            //     framebuffer[y + 2][x + 0] == WHT) {
-            //     hitship = true;
-            // }
 
             SET_PIXEL(x + 0, y + 0, color);
             SET_PIXEL(x + 0, y + 1, color);
@@ -293,13 +277,6 @@ bool render_asteroid_shape(uint8_t index, uint8_t color) {
         }
         case ASTEROID_SHAPE_MIDDLE: {
             if (!fits_on_screen(x, y, 4, 4)) return true;
-
-            // if (framebuffer[y + 0][x + 2] == WHT ||
-            //     framebuffer[y + 1][x + 1] == WHT ||
-            //     framebuffer[y + 2][x + 0] == WHT ||
-            //     framebuffer[y + 3][x + 1] == WHT) {
-            //     hitship = true;
-            // }
 
             SET_PIXEL(x + 0, y + 2, color);
 
@@ -317,14 +294,6 @@ bool render_asteroid_shape(uint8_t index, uint8_t color) {
         }
         case ASTEROID_SHAPE_BIG: {
             if (!fits_on_screen(x, y, 6, 5)) return true;
-
-            // if (framebuffer[y + 0][x + 3] == WHT ||
-            //     framebuffer[y + 1][x + 2] == WHT ||
-            //     framebuffer[y + 2][x + 1] == WHT ||
-            //     framebuffer[y + 3][x + 0] == WHT ||
-            //     framebuffer[y + 4][x + 1] == WHT) {
-            //     hitship = true;
-            // }
 
             SET_PIXEL(x + 0, y + 1, color);
             SET_PIXEL(x + 0, y + 2, color);
@@ -397,19 +366,19 @@ bool asteroid_hit(uint8_t index, uint8_t x, uint8_t y) {
     uint8_t ay = asteroids[index].y;
     switch (asteroids[index].shape) {
         case ASTEROID_SHAPE_BIG: {
-            if (!(x >= ax && x <= ax + 5 && y >= ay && y <= ay + 4)) {
+            if (!INTERSECT_POINT(ax, ay, 6, 4, x, y)) {
                 return false;
             }
             break;
         }
         case ASTEROID_SHAPE_MIDDLE: {
-            if (!(x >= ax && x <= ax + 3 && y >= ay && y <= ay + 3)) {
+            if (!INTERSECT_POINT(ax, ay, 4, 4, x, y)) {
                 return false;
             }
             break;
         }
         case ASTEROID_SHAPE_SMALL: {
-            if (!(x >= ax && x <= ax + 2 && y >= ay && y <= ay + 2)) {
+            if (!INTERSECT_POINT(ax, ay, 3, 3, x, y)) {
                 return false;
             }
             break;
