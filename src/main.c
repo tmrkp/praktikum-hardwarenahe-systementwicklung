@@ -66,6 +66,14 @@ inline bool intersect_area(uint8_t x1, uint8_t y1, uint8_t w1, uint8_t h1,
 }
 
 typedef enum {
+    GAME_STATE_START,
+    GAME_STATE_INGAME,
+    GAME_STATE_GAMEOVER,
+} game_state_t;
+
+game_state_t state = GAME_STATE_START;
+
+typedef enum {
     ASTEROID_SHAPE_BIG,
     ASTEROID_SHAPE_SMALL,
     ASTEROID_SHAPE_MIDDLE,
@@ -99,12 +107,18 @@ typedef struct {
 laser_t laser[8];
 uint8_t laser_index = 0;
 
-void game_over() {
+inline void render_game_over() {
     for (uint8_t x = 0; x < WIDTH; x++) {
         for (uint8_t y = 0; y < HEIGHT; y++) {
             framebuffer[y][x] = BLK;
         }
     }
+}
+
+inline void render_game() {
+}
+
+inline void render_game_over() {
 }
 
 bool spaceship_hit(uint8_t index) {
@@ -488,6 +502,20 @@ void main() {
     NES_CLK   = 0;
 
     render_spaceship();
+
+    while (1) {
+        switch (state) {
+            case GAME_STATE_START:
+                render_start_game();
+                break;
+            case GAME_STATE_INGAME:
+                render_game();
+                break;
+            case GAME_STATE_GAMEOVER:
+                game_over();
+                break;
+        }
+    }
 
     while (1) {
         static uint16_t last_render_tick = 0;
