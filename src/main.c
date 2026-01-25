@@ -60,85 +60,96 @@ uint16_t tick;
         framebuffer[(y)][(x)] = (color); \
     }
 
-#define INTERSECT_AREA(x1, y1, w1, h1, x2, y2, w2, h2) (y2 + h2 >= y1 && y2 < y1 + h1 && x2 + w2 >= x1 && x2 < x1 + w1)
+#define INTERSECT_AREA(x1, y1, w1, h1, x2, y2, w2, h2) ((y2) + (h2) >= (y1) && (y2) < (y1) + (h1) && (x2) + (w2) >= (x1) && (x2) < (x1) + (w1))
 
-#define INTERSECT_POINT(x1, y1, w1, h1, x2, y2) (x2 >= x1 && x2 < x1 + w1 && y2 >= y1 && y2 < y1 + h1)
+#define INTERSECT_POINT(x1, y1, w1, h1, x2, y2) ((x2) >= (x1) && (x2) < (x1) + (w1) && (y2) >= (y1) && (y2) < (y1) + (h1))
 
-#define FONT_H 5
-#define FONT_W 5
+__code uint8_t font_A[] = {
+    0b01100000,
+    0b10010000,
+    0b11110000,
+    0b10010000,
+    0b10010000,
+};
 
-const uint8_t font_A[] = {
-    0b01100,
-    0b10010,
-    0b11110,
-    0b10010,
-    0b10010};
+__code uint8_t font_E[] = {
+    0b11110000,
+    0b10000000,
+    0b11100000,
+    0b10000000,
+    0b11110000,
+};
 
-const uint8_t font_E[] = {
-    0b11110,
-    0b10000,
-    0b11100,
-    0b10000,
-    0b11110};
+__code uint8_t font_G[] = {
+    0b01110000,
+    0b10000000,
+    0b10110000,
+    0b10010000,
+    0b01110000,
+};
 
-const uint8_t font_G[] = {
-    0b01110,
-    0b10000,
-    0b10110,
-    0b10010,
-    0b01110};
+__code uint8_t font_M[] = {
+    0b10001000,
+    0b11011000,
+    0b10101000,
+    0b10001000,
+    0b10001000,
+};
 
-const uint8_t font_M[] = {
-    0b10001,
-    0b11011,
-    0b10101,
-    0b10001,
-    0b10001};
+__code uint8_t font_O[] = {
+    0b01110000,
+    0b10001000,
+    0b10001000,
+    0b10001000,
+    0b01110000,
+};
 
-const uint8_t font_O[] = {
-    0b01110,
-    0b10001,
-    0b10001,
-    0b10001,
-    0b01110};
+__code uint8_t font_R[] = {
+    0b11100000,
+    0b10010000,
+    0b11100000,
+    0b10100000,
+    0b10010000,
+};
 
-const uint8_t font_R[] = {
-    0b11100,
-    0b10010,
-    0b11100,
-    0b10100,
-    0b10010};
+__code uint8_t font_S[] = {
+    0b01110000,
+    0b10000000,
+    0b01100000,
+    0b00010000,
+    0b11100000,
+};
 
-const uint8_t font_S[] = {
-    0b01110,
-    0b10000,
-    0b01100,
-    0b00010,
-    0b11100};
+__code uint8_t font_T[] = {
+    0b11100000,
+    0b01000000,
+    0b01000000,
+    0b01000000,
+    0b01000000,
+};
 
-const uint8_t font_T[] = {
-    0b11100,
-    0b01000,
-    0b01000,
-    0b01000,
-    0b01000};
+__code uint8_t font_V[] = {
+    0b10100000,
+    0b10100000,
+    0b10100000,
+    0b01000000,
+    0b01000000,
+};
 
-const uint8_t font_V[] = {
-    0b10100,
-    0b10100,
-    0b10100,
-    0b01000,
-    0b01000};
-
-void render_font(const uint8_t* glyph, uint8_t x, uint8_t y, uint8_t color) {
-    for (uint8_t row = 0; row < FONT_H; row++) {
-        uint8_t bits = glyph[row];
-        for (uint8_t col = 0; col < FONT_W; col++) {
-            if (bits & (1 << (FONT_W - 1 - col))) {
-                framebuffer[y + row][x + col] = color;
+void render_font(__code uint8_t* glyph, uint8_t x0, uint8_t y, uint8_t color) {
+    uint8_t i = 5;
+    do {
+        uint8_t bitmask = *glyph++;
+        uint8_t x       = x0;
+        do {
+            if (bitmask & 0x80) {
+                framebuffer[y][x] = color;
             }
-        }
-    }
+            bitmask <<= 1;
+            x++;
+        } while (bitmask != 0);
+        y++;
+    } while (--i > 0);
 }
 
 void clear_screen() {
@@ -158,6 +169,27 @@ typedef enum {
 } game_state_t;
 
 game_state_t state = GAME_STATE_DRAW_START;
+
+__code uint8_t asteroid_bitmap_0[] = {
+    0b00100000,
+    0b01100000,
+    0b11100000,
+};
+
+__code uint8_t asteroid_bitmap_1[] = {
+    0b00110000,
+    0b01110000,
+    0b11100000,
+    0b01000000,
+};
+
+__code uint8_t asteroid_bitmap_2[] = {
+    0b01110000,
+    0b11111000,
+    0b11111100,
+    0b11111100,
+    0b00110000,
+};
 
 typedef enum {
     ASTEROID_SHAPE_BIG = 0,
@@ -568,6 +600,7 @@ void main() {
     NES_CLK   = 0;
 
     while (1) {
+        // throttle main loop to 20 Hz
         static uint16_t last_render_tick = 0;
         if (tick - last_render_tick < 5) continue;
 
@@ -720,8 +753,6 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     m_ptr = matrix;
     f_ptr = framebuffer;
 
-    // LED = 1;
-
     // shift framebuffer pointer to the currently scanned line
     f_ptr += (line << 5);
 
@@ -777,8 +808,6 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     if (line >= 8) line = 0;
 
     if (line == 0 || line == 3) tick++;
-
-    // LED = 0;
 }
 
 void timer1() __interrupt(TF1_VECTOR) __using(0) {
