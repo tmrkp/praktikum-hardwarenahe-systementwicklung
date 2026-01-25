@@ -139,16 +139,15 @@ __code uint8_t font_V[] = {
 void render_font(__code uint8_t* glyph, uint8_t x0, uint8_t y, uint8_t color) {
     uint8_t i = 5;
     do {
-        uint8_t bitmask = *glyph++;
-        uint8_t x       = x0;
+        uint8_t          bitmask = *glyph++;
+        __xdata uint8_t* f_ptr   = framebuffer[y++] + x0;
         do {
             if (bitmask & 0x80) {
-                framebuffer[y][x] = color;
+                *f_ptr = color;
             }
             bitmask <<= 1;
-            x++;
+            f_ptr++;
         } while (bitmask != 0);
-        y++;
     } while (--i > 0);
 }
 
