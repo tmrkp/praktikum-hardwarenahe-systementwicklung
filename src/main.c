@@ -198,7 +198,7 @@ typedef struct {
 
 rng_t rng = {0, 0, 0, 1};
 
-void seed(uint8_t seed) {
+inline void seed(uint8_t seed) {
     rng.x = seed;
     rng.y = seed ^ 0xA5;
     rng.z = (seed << 1) | (seed >> 7);
@@ -426,7 +426,7 @@ void asteroid_update(__idata asteroid_t* asteroid) {
     }
 }
 
-void asteroid_generate(__idata asteroid_t* asteroid) {
+inline void asteroid_generate(__idata asteroid_t* asteroid) {
     uint8_t r  = rand();
     uint8_t r2 = rand();
 
@@ -465,7 +465,7 @@ void asteroid_generate(__idata asteroid_t* asteroid) {
     asteroid->hp      = asteroid->type->hp;
 }
 
-void asteroid_spawn() {
+inline void asteroid_spawn() {
     static uint16_t last_asteroid_tick = 0;
     if (tick - last_asteroid_tick > 100) {
         asteroid_generate(asteroids + asteroids_index);
@@ -527,14 +527,14 @@ void spaceship_clear() {
     }
 }
 
-void spaceship_render() {
+inline void spaceship_render() {
     framebuffer[spaceship.y][spaceship.x]     = WHT;
     framebuffer[spaceship.y][spaceship.x + 1] = WHT;
     framebuffer[spaceship.y - 1][spaceship.x] = WHT;
     framebuffer[spaceship.y + 1][spaceship.x] = WHT;
 }
 
-void spaceship_update() {
+inline void spaceship_update() {
     if (PRESSED(BTN_UP) && spaceship.y >= 3) {
         spaceship_clear();
         spaceship.y -= 1;
@@ -593,7 +593,7 @@ typedef struct {
 __idata laser_t laser[8];
 uint8_t         laser_index = 0;
 
-void laser_spawn() {
+inline void laser_spawn() {
     if (JUST_PRESSED(BTN_A)) {
         laser[laser_index].x       = spaceship.x + 2;
         laser[laser_index].y       = spaceship.y;
@@ -654,7 +654,7 @@ void laser_update(__idata laser_t* laser) {
 
 uint8_t last_rendered_hp = 0xFF;
 
-void healthbar_update() {
+inline void healthbar_update() {
     if (last_rendered_hp != spaceship.hp) {
         for (uint8_t i = 0; i < 16; i++) {
             framebuffer[0][i] = (spaceship.hp > i) ? RED : BLK;
@@ -666,7 +666,7 @@ void healthbar_update() {
 
 uint8_t last_rendered_score = 0xFF;
 
-void score_update() {
+inline void score_update() {
     if (last_rendered_score != spaceship.score) {
         __xdata uint8_t* f_ptr = framebuffer + 16;
 
@@ -680,7 +680,7 @@ void score_update() {
     }
 }
 
-void game_reset() {
+inline void game_reset() {
     spaceship.x     = 3;
     spaceship.y     = 8;
     spaceship.hp    = 16;
@@ -707,7 +707,7 @@ void game_reset() {
  *
  * @return bitmask of pressed buttons
  */
-uint8_t read_controller() {
+inline uint8_t read_controller() {
     uint8_t value = 0;
 
     // Pulse Latch to sample buttons states in shift register
