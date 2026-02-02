@@ -26,16 +26,16 @@
 #define BTN_A 0x80
 
 // Colors
-#define BLK (0x00)
-#define WHT (0x3F)
-#define RED (0x30)
-#define GRN (0x0C)
-#define BLU (0x03)
-#define YEL (0x3C)
-#define MAG (0x33)
-#define CYN (0x0F)
-#define ORG (0x38)
-#define RED_LIGHT (0x10)
+#define BLK 0x00
+#define WHT 0x3F
+#define RED 0x30
+#define GRN 0x0C
+#define BLU 0x03
+#define YEL 0x3C
+#define MAG 0x33
+#define CYN 0x0F
+#define ORG 0x38
+#define RED_LIGHT 0x10
 
 // LED Matrix Pixel Size
 #define WIDTH 32
@@ -97,11 +97,11 @@ __code uint8_t font_M[] = {
 };
 
 __code uint8_t font_O[] = {
-    0b01110000,
-    0b10001000,
-    0b10001000,
-    0b10001000,
-    0b01110000,
+    0b01100000,
+    0b10010000,
+    0b10010000,
+    0b10010000,
+    0b01100000,
 };
 
 __code uint8_t font_R[] = {
@@ -190,22 +190,56 @@ __code uint8_t asteroid_bitmap_2[] = {
     0b00110000,
 };
 
-typedef enum {
-    ASTEROID_SHAPE_BIG = 0,
-    ASTEROID_SHAPE_SMALL,
-    ASTEROID_SHAPE_MIDDLE,
-} asteroid_shape_t;
+__code uint8_t asteroid_bitmap_3[] = {
+    0b11000000,
+    0b11000000,
+};
 
 typedef struct {
-    int8_t           x;
-    int8_t           y;
-    asteroid_shape_t shape;
-    bool             visible;
-    uint8_t          hp;
+    int8_t          w;
+    int8_t          h;
+    uint8_t         damage;
+    __code uint8_t* bitmap;
+} asteroid_type_t;
+
+__idata asteroid_type_t asteroid_types[] = {
+    {
+        .w      = 2,
+        .h      = 2,
+        .damage = 1,
+        .bitmap = asteroid_bitmap_3,
+    },
+    {
+        .w      = 3,
+        .h      = 3,
+        .damage = 1,
+        .bitmap = asteroid_bitmap_0,
+    },
+    {
+        .w      = 4,
+        .h      = 4,
+        .damage = 1,
+        .bitmap = asteroid_bitmap_1,
+    },
+    {
+        .w      = 6,
+        .h      = 5,
+        .damage = 2,
+        .bitmap = asteroid_bitmap_2,
+    },
+};
+
+typedef struct {
+    __idata asteroid_type_t* type;
+
+    int8_t  x;
+    int8_t  y;
+    bool    visible;
+    uint8_t hp;
 } asteroid_t;
 
-asteroid_t asteroids[8];
-uint8_t    asteroids_index = 0;
+__idata asteroid_t asteroids[8];
+uint8_t            asteroids_index = 0;
 
 typedef struct {
     uint8_t x;
@@ -221,8 +255,8 @@ typedef struct {
     bool    visible;
 } laser_t;
 
-laser_t laser[8];
-uint8_t laser_index = 0;
+__idata laser_t laser[8];
+uint8_t         laser_index = 0;
 
 void game_reset() {
     spaceship.x  = 3;
@@ -242,44 +276,21 @@ void game_reset() {
     laser_index = 0;
 }
 
-bool spaceship_hit(uint8_t index) {
-    if (!asteroids[index].visible) {
+bool spaceship_hit(__idata asteroid_t* asteroid) {
+    if (!asteroid->visible) {
         return false;
     }
-    switch (asteroids[index].shape) {
-        case ASTEROID_SHAPE_BIG: {
-            if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 6, 5)) {
-                if (spaceship.hp <= 2) {
-                    state = GAME_STATE_DRAW_GAMEOVER;
-                    return true;
-                };
-                spaceship.hp -= 2;
-                return true;
-            }
-            break;
+
+    __idata asteroid_type_t* type = asteroid->type;
+
+    if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroid->x, asteroid->y, type->w, type->h)) {
+        if (spaceship.hp <= type->damage) {
+            state = GAME_STATE_DRAW_GAMEOVER;
+            return true;
         }
-        case ASTEROID_SHAPE_MIDDLE: {
-            if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 4, 4)) {
-                if (spaceship.hp <= 1) {
-                    state = GAME_STATE_DRAW_GAMEOVER;
-                    return true;
-                };
-                spaceship.hp -= 1;
-                return true;
-            }
-            break;
-        }
-        case ASTEROID_SHAPE_SMALL: {
-            if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroids[index].x, asteroids[index].y, 3, 3)) {
-                if (spaceship.hp <= 1) {
-                    state = GAME_STATE_DRAW_GAMEOVER;
-                    return true;
-                };
-                spaceship.hp -= 1;
-                return true;
-            }
-            break;
-        }
+
+        spaceship.hp -= type->damage;
+        return true;
     }
     return false;
 }
@@ -288,89 +299,72 @@ inline bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
     return (x + w >= 0) && (x < WIDTH) && (y + h >= 0) && (y <= HEIGHT);
 }
 
-bool render_asteroid_shape(uint8_t index, uint8_t color) {
-    uint8_t x = asteroids[index].x;
-    uint8_t y = asteroids[index].y;
+bool render_asteroid_shape(__idata asteroid_t* asteroid, uint8_t color) {
+    __idata asteroid_type_t* type = asteroid->type;
 
-    switch (asteroids[index].shape) {
-        case ASTEROID_SHAPE_SMALL: {
-            if (!fits_on_screen(x, y, 3, 3)) return true;
+    int8_t x = asteroid->x;
+    int8_t y = asteroid->y;
 
-            SET_PIXEL(x + 0, y + 0, color);
-            SET_PIXEL(x + 0, y + 1, color);
-            SET_PIXEL(x + 0, y + 2, color);
+    // asteroid bitmap bounds
+    int8_t sx = x;
+    int8_t ex = x + type->w;
+    int8_t sy = y;
+    int8_t ey = y + type->h;
 
-            SET_PIXEL(x + 1, y + 1, color);
-            SET_PIXEL(x + 1, y + 2, color);
+    // apply framebuffer bounds
+    if (sx < 0) sx = 0;
+    if (sy < 1) sy = 1;
+    if (ex > WIDTH) ex = WIDTH;
+    if (ey > HEIGHT) ey = HEIGHT;
 
-            SET_PIXEL(x + 2, y + 2, color);
-            break;
-        }
-        case ASTEROID_SHAPE_MIDDLE: {
-            if (!fits_on_screen(x, y, 4, 4)) return true;
-
-            SET_PIXEL(x + 0, y + 2, color);
-
-            SET_PIXEL(x + 1, y + 1, color);
-            SET_PIXEL(x + 1, y + 2, color);
-            SET_PIXEL(x + 1, y + 3, color);
-
-            SET_PIXEL(x + 2, y + 0, color);
-            SET_PIXEL(x + 2, y + 1, color);
-            SET_PIXEL(x + 2, y + 2, color);
-
-            SET_PIXEL(x + 3, y + 0, color);
-            SET_PIXEL(x + 3, y + 1, color);
-            break;
-        }
-        case ASTEROID_SHAPE_BIG: {
-            if (!fits_on_screen(x, y, 6, 5)) return true;
-
-            SET_PIXEL(x + 0, y + 1, color);
-            SET_PIXEL(x + 0, y + 2, color);
-            SET_PIXEL(x + 0, y + 3, color);
-
-            SET_PIXEL(x + 1, y + 0, color);
-            SET_PIXEL(x + 1, y + 1, color);
-            SET_PIXEL(x + 1, y + 2, color);
-            SET_PIXEL(x + 1, y + 3, color);
-
-            SET_PIXEL(x + 2, y + 0, color);
-            SET_PIXEL(x + 2, y + 1, color);
-            SET_PIXEL(x + 2, y + 2, color);
-            SET_PIXEL(x + 2, y + 3, color);
-            SET_PIXEL(x + 2, y + 4, color);
-
-            SET_PIXEL(x + 3, y + 0, color);
-            SET_PIXEL(x + 3, y + 1, color);
-            SET_PIXEL(x + 3, y + 2, color);
-            SET_PIXEL(x + 3, y + 3, color);
-            SET_PIXEL(x + 3, y + 4, color);
-
-            SET_PIXEL(x + 4, y + 1, color);
-            SET_PIXEL(x + 4, y + 2, color);
-            SET_PIXEL(x + 4, y + 3, color);
-
-            SET_PIXEL(x + 5, y + 2, color);
-            SET_PIXEL(x + 5, y + 3, color);
-
-            break;
-        }
+    // asteroid is not in frame
+    if (sx >= ex || sy >= ey) {
+        return false;
     }
 
-    return false;
+    __code uint8_t* bitmap = type->bitmap;
+
+    // clip top
+    bitmap += sy - y;
+
+    // clip horizontal
+    x = sx - x;
+
+    // loop variables
+    ex -= sx;
+    ey -= sy;
+    do {
+        uint8_t bitmask = *bitmap++;
+
+        if (x) {
+            bitmask <<= x;
+        }
+
+        __xdata uint8_t* f_ptr = framebuffer[sy++] + sx;
+
+        uint8_t bits = ex;
+        do {
+            if (bitmask & 0x80) {
+                *f_ptr = color;
+            }
+            bitmask <<= 1;
+            f_ptr++;
+        } while (--bits > 0);
+    } while (--ey > 0);
+
+    return true;
 }
 
-void render_asteroid(uint8_t index) {
-    if (!asteroids[index].visible) {
+void render_asteroid(__idata asteroid_t* asteroid) {
+    if (!asteroid->visible) {
         return;
     }
-    render_asteroid_shape(index, BLK);
-    asteroids[index].x -= 1;
+    render_asteroid_shape(asteroid, BLK);
+    asteroid->x -= 1;
 
     uint8_t color;
 
-    switch (asteroids[index].hp) {
+    switch (asteroid->hp) {
         case 1: {
             color = ORG;
             break;
@@ -385,63 +379,43 @@ void render_asteroid(uint8_t index) {
         }
     }
 
-    if (render_asteroid_shape(index, color)) {
-        asteroids[index].visible = false;
+    if (!render_asteroid_shape(asteroid, color)) {
+        asteroid->visible = false;
     }
 }
 
-bool asteroid_hit(uint8_t index, uint8_t x, uint8_t y) {
-    if (!asteroids[index].visible) return false;
+bool asteroid_hit(__idata asteroid_t* asteroid, int8_t x, int8_t y) {
+    if (!asteroid->visible) return false;
 
-    uint8_t ax = asteroids[index].x;
-    uint8_t ay = asteroids[index].y;
-    switch (asteroids[index].shape) {
-        case ASTEROID_SHAPE_BIG: {
-            if (!INTERSECT_POINT(ax, ay, 6, 4, x, y)) {
-                return false;
-            }
-            break;
-        }
-        case ASTEROID_SHAPE_MIDDLE: {
-            if (!INTERSECT_POINT(ax, ay, 4, 4, x, y)) {
-                return false;
-            }
-            break;
-        }
-        case ASTEROID_SHAPE_SMALL: {
-            if (!INTERSECT_POINT(ax, ay, 3, 3, x, y)) {
-                return false;
-            }
-            break;
-        }
+    __idata asteroid_type_t* type = asteroid->type;
+
+    if (!INTERSECT_POINT(asteroid->x, asteroid->y, type->w, type->h, x, y)) {
+        return false;
     }
 
-    asteroids[index].hp--;
+    asteroid->hp--;
 
-    if (asteroids[index].hp == 0) {
-        asteroids[index].visible = false;
-        render_asteroid_shape(index, BLK);
+    if (asteroid->hp == 0) {
+        asteroid->visible = false;
+        render_asteroid_shape(asteroid, BLK);
     }
 
     return true;
 }
 
 void render_spaceship() {
-    bool spaceship_hit_bool = false;
-    if (framebuffer[spaceship.y][spaceship.x] != BLK) spaceship_hit_bool = true;
-    if (framebuffer[spaceship.y][spaceship.x + 1] != BLK) spaceship_hit_bool = true;
-    if (framebuffer[spaceship.y - 1][spaceship.x] != BLK) spaceship_hit_bool = true;
-    if (framebuffer[spaceship.y + 1][spaceship.x] != BLK) spaceship_hit_bool = true;
-
-    if (spaceship_hit_bool) {
-        if (spaceship_hit(0)) {
-        } else if (spaceship_hit(1)) {
-        } else if (spaceship_hit(2)) {
-        } else if (spaceship_hit(3)) {
-        } else if (spaceship_hit(4)) {
-        } else if (spaceship_hit(5)) {
-        } else if (spaceship_hit(6)) {
-        } else if (spaceship_hit(7)) {
+    if (framebuffer[spaceship.y][spaceship.x] != BLK ||
+        framebuffer[spaceship.y][spaceship.x + 1] != BLK ||
+        framebuffer[spaceship.y - 1][spaceship.x] != BLK ||
+        framebuffer[spaceship.y + 1][spaceship.x] != BLK) {
+        if (spaceship_hit(asteroids + 0)) {
+        } else if (spaceship_hit(asteroids + 1)) {
+        } else if (spaceship_hit(asteroids + 2)) {
+        } else if (spaceship_hit(asteroids + 3)) {
+        } else if (spaceship_hit(asteroids + 4)) {
+        } else if (spaceship_hit(asteroids + 5)) {
+        } else if (spaceship_hit(asteroids + 6)) {
+        } else if (spaceship_hit(asteroids + 7)) {
         }
     }
 
@@ -458,38 +432,38 @@ void clear_spaceship() {
     framebuffer[spaceship.y + 1][spaceship.x] = BLK;
 }
 
-void render_laser(uint8_t index) {
-    if (!laser[index].visible) {
+void render_laser(__idata laser_t* laser) {
+    if (!laser->visible) {
         return;
     }
-    framebuffer[laser[index].y][laser[index].x] = BLK;
-    laser[index].x++;
-    if (laser[index].x >= 32) {
-        laser[index].visible = 0;
+    framebuffer[laser->y][laser->x] = BLK;
+    laser->x++;
+    if (laser->x >= 32) {
+        laser->visible = 0;
         return;
     }
 
-    if (framebuffer[laser[index].y][laser[index].x] != BLK) {
+    if (framebuffer[laser->y][laser->x] != BLK) {
         // we know we hit something, but we need to find the exact asteroid we hit
-        if (asteroid_hit(0, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(1, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(2, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(3, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(4, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(5, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(6, laser[index].x, laser[index].y)) {
-        } else if (asteroid_hit(7, laser[index].x, laser[index].y)) {
+        if (asteroid_hit(asteroids + 0, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 1, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 2, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 3, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 4, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 5, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 6, laser->x, laser->y)) {
+        } else if (asteroid_hit(asteroids + 7, laser->x, laser->y)) {
         }
 
-        laser[index].visible = 0;
+        laser->visible = 0;
         return;
     }
 
-    framebuffer[laser[index].y][laser[index].x] = RED;
+    framebuffer[laser->y][laser->x] = RED;
 }
 
 void render_healthbar() {
-    static uint8_t last_hp = -1;
+    static uint8_t last_hp = 0xFF;
 
     if (last_hp != spaceship.hp) {
         framebuffer[0][0]  = (spaceship.hp >= 1) ? RED : RED_LIGHT;
@@ -513,7 +487,7 @@ void render_healthbar() {
     }
 }
 
-// Random Number Generator
+// Pseudo Random Number Generator
 // Source: github.com/edrosten/8bit_rng
 
 typedef struct {
@@ -573,24 +547,25 @@ uint8_t read_controller() {
 }
 
 void main() {
-    TMOD = M0_0 | M0_1;
+    // timer 0 in 16-bit mode
+    // timer 1 in 8-bit autoreload mode
+    TMOD = M0_0 | M1_1;
 
-    // timer 0
-    TH0 = 0xEF;  // 2.5ms
+    // timer 0 interrupt in 2.5 ms
+    TH0 = 0xEF;
     TL0 = 0xB9;
 
-    // // timer 1
-    // TH1 = 0xBE;  // 10 ms
-    // TL1 = 0xE5;
+    // timer 1 freerunning 0-255
+    TH1 = 0x00;
+    TL1 = 0x00;
 
     // interrupt config
     EA  = 1;  // enable interrupts
     ET0 = 1;  // enable timer 0 interrupt
-    // ET1 = 1;  // enable timer 1 interrupt
-    // PT1 = 1;  // prioritize timer 1 interrupt
 
     TR0 = 1;  // enable timer 0
-    // TR1  = 1;  // enable timer 1
+    TR1 = 1;  // enable timer 1
+
     LED = 1;  // disable LED
 
     P2 = 0x40;  // matrix address high byte
@@ -626,6 +601,10 @@ void main() {
             }
             case GAME_STATE_START: {
                 if ((controller & BTN_START) && !(last_controller & BTN_START)) {
+                    // use timer 1 low byte as random seed
+                    // timer 0 can't be used, it's synced with the game loop
+                    seed(TL1);
+
                     clear_screen();
                     game_reset();
                     state = GAME_STATE_INGAME;
@@ -633,7 +612,7 @@ void main() {
                 break;
             }
             case GAME_STATE_INGAME: {
-                if ((controller & BTN_UP) && spaceship.y >= 2) {
+                if ((controller & BTN_UP) && spaceship.y >= 3) {
                     clear_spaceship();
                     spaceship.y -= 1;
                 }
@@ -655,13 +634,13 @@ void main() {
 
                 static uint16_t last_asteroid_tick = 0;
                 if (tick - last_asteroid_tick > 200) {
-                    int8_t y     = rand() & 0x0F;
-                    int8_t shape = rand() & 0x03;
-                    if (shape == 3) shape = 1;
+                    int8_t y = rand() & 0x0F;
+                    int8_t i = rand() & 0x03;
+
                     asteroids[asteroids_index].y       = y - 2;
                     asteroids[asteroids_index].x       = 31;
                     asteroids[asteroids_index].visible = true;
-                    asteroids[asteroids_index].shape   = shape;
+                    asteroids[asteroids_index].type    = asteroid_types + i;
                     asteroids[asteroids_index].hp      = 3;
                     asteroids_index++;
                     if (asteroids_index >= 8) asteroids_index = 0;
@@ -669,14 +648,14 @@ void main() {
                     last_asteroid_tick = tick;
                 }
 
-                render_asteroid(0);
-                render_asteroid(1);
-                render_asteroid(2);
-                render_asteroid(3);
-                render_asteroid(4);
-                render_asteroid(5);
-                render_asteroid(6);
-                render_asteroid(7);
+                render_asteroid(asteroids + 0);
+                render_asteroid(asteroids + 1);
+                render_asteroid(asteroids + 2);
+                render_asteroid(asteroids + 3);
+                render_asteroid(asteroids + 4);
+                render_asteroid(asteroids + 5);
+                render_asteroid(asteroids + 6);
+                render_asteroid(asteroids + 7);
 
                 if ((controller & BTN_A) && !(last_controller & BTN_A)) {
                     laser[laser_index].x       = spaceship.x + 2;
@@ -686,14 +665,14 @@ void main() {
                     if (laser_index >= 8) laser_index = 0;
                 }
 
-                render_laser(0);
-                render_laser(1);
-                render_laser(2);
-                render_laser(3);
-                render_laser(4);
-                render_laser(5);
-                render_laser(6);
-                render_laser(7);
+                render_laser(laser + 0);
+                render_laser(laser + 1);
+                render_laser(laser + 2);
+                render_laser(laser + 3);
+                render_laser(laser + 4);
+                render_laser(laser + 5);
+                render_laser(laser + 6);
+                render_laser(laser + 7);
 
                 render_healthbar();
                 render_spaceship();
@@ -732,7 +711,11 @@ void main() {
 }
 
 void timer0() __interrupt(TF0_VECTOR) __using(1) {
-    // remember scan line across ISR calls
+    // timer 0 interrupt in 2.5 ms
+    TH0 = 0xEF;
+    TL0 = 0xB9;
+
+    // remember scan line across interrupt calls
     static uint8_t line = 0;
 
     uint8_t i;
@@ -740,10 +723,6 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
 
     __pdata uint8_t* m_ptr;
     __xdata uint8_t* f_ptr;
-
-    // restart timer 0
-    TH0 = 0xEF;  // 2.5ms
-    TL0 = 0xB9;
 
     // prepare matrix cmd to write line
     cmd = line | 0x8;
