@@ -7,6 +7,21 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// helper macro to convert integer to fixed point (6 bits integer and 2 bits fractional)
+#define INT_TO_Q6_2(x) (x << 2)
+
+// helper macro to convert fixed point (6 bits integer and 2 bits fractional) to integer
+#define Q6_2_TO_INT(x) (x >> 2)
+
+#define BIT0 0x01
+#define BIT1 0x02
+#define BIT2 0x04
+#define BIT3 0x08
+#define BIT4 0x10
+#define BIT5 0x20
+#define BIT6 0x40
+#define BIT7 0x80
+
 // PINS for NES controller
 #define NES_CLK P1_2
 #define NES_LATCH P1_0
@@ -16,14 +31,14 @@
 #define LED P3_5
 
 // Button bitmapping for NES controller
-#define BTN_RIGHT 0x01
-#define BTN_LEFT 0x02
-#define BTN_DOWN 0x04
-#define BTN_UP 0x08
-#define BTN_START 0x10
-#define BTN_SELECT 0x20
-#define BTN_B 0x40
-#define BTN_A 0x80
+#define BTN_RIGHT BIT0
+#define BTN_LEFT BIT1
+#define BTN_DOWN BIT2
+#define BTN_UP BIT3
+#define BTN_START BIT4
+#define BTN_SELECT BIT5
+#define BTN_B BIT6
+#define BTN_A BIT7
 
 // Colors
 #define BLK 0x00
@@ -52,17 +67,20 @@ __pdata uint8_t* matrix = (__pdata uint8_t*) 0x00;
 // tick counter for game code timings (one tick every 10 ms)
 uint16_t tick;
 
-// checks if a pixel is within the frame buffer
-#define IN_BOUNDS(x, y) ((uint8_t) (x) < WIDTH && (uint8_t) (y) < HEIGHT)
+// current and previous controller state
+uint8_t last_controller = 0;
+uint8_t controller      = 0;
 
-// set a pixel in the framebuffer with bounds check
-#define SET_PIXEL(x, y, color)           \
-    if (IN_BOUNDS(x, y)) {               \
-        framebuffer[(y)][(x)] = (color); \
-    }
+// checks if a button is currently pressed
+#define PRESSED(btn) (controller & (btn))
 
+// checks if a button was pressed once (rising edge)
+#define JUST_PRESSED(btn) ((controller & btn) && !(last_controller & btn))
+
+// checks if two areas intersect anywhere
 #define INTERSECT_AREA(x1, y1, w1, h1, x2, y2, w2, h2) ((y2) + (h2) >= (y1) && (y2) < (y1) + (h1) && (x2) + (w2) >= (x1) && (x2) < (x1) + (w1))
 
+// checks if a point is within an area
 #define INTERSECT_POINT(x1, y1, w1, h1, x2, y2) ((x2) >= (x1) && (x2) < (x1) + (w1) && (y2) >= (y1) && (y2) < (y1) + (h1))
 
 __code uint8_t font_A[] = {
@@ -153,23 +171,23 @@ __code uint8_t font_W[] = {
     0b01010000,
 };
 
-void render_font(__code uint8_t* glyph, uint8_t x0, uint8_t y, uint8_t color) {
-    uint8_t i = 5;
+// renders a single letter. does not check for framebuffer array bounds.
+void render_font(__code uint8_t* bitmap, uint8_t x0, uint8_t y, uint8_t color) {
+    uint8_t height = 5;
     do {
-        uint8_t          bitmask = *glyph++;
-        __xdata uint8_t* f_ptr   = framebuffer[y++] + x0;
+        uint8_t bitmask = *bitmap++;
+
+        __xdata uint8_t* f_ptr = framebuffer[y++] + x0;
+
         do {
-            if (bitmask & 0x80) {
+            if (bitmask & BIT7) {
                 *f_ptr = color;
             }
             bitmask <<= 1;
             f_ptr++;
         } while (bitmask != 0);
-    } while (--i > 0);
+    } while (--height > 0);  // djnz loop
 }
-
-// Pseudo Random Number Generator
-// Source: github.com/edrosten/8bit_rng
 
 typedef struct {
     uint8_t x;
@@ -184,9 +202,11 @@ void seed(uint8_t seed) {
     rng.x = seed;
     rng.y = seed ^ 0xA5;
     rng.z = (seed << 1) | (seed >> 7);
-    rng.a = seed | 1;  // ensure non-zero
+    rng.a = seed | BIT0;  // ensure non-zero
 }
 
+// Pseudo Random Number Generator
+// Source: github.com/edrosten/8bit_rng
 uint8_t rand() {
     uint8_t t = rng.x ^ (rng.x << 4);
 
@@ -199,50 +219,42 @@ uint8_t rand() {
     return rng.a;
 }
 
-void clear_screen() {
-    for (uint8_t x = 0; x < WIDTH; x++) {
-        for (uint8_t y = 0; y < HEIGHT; y++) {
-            framebuffer[y][x] = BLK;
-        }
-    }
-}
-
 typedef enum {
-    GAME_STATE_DRAW_START,
-    GAME_STATE_START,
-    GAME_STATE_INGAME,
-    GAME_STATE_DRAW_GAMEOVER,
-    GAME_STATE_GAMEOVER,
-    GAME_STATE_DRAW_WON,
-    GAME_STATE_WON
+    GAME_STATE_DRAW_START,     // intermediate state used to draw "Start Game" once
+    GAME_STATE_START,          // waiting for user input "Start" button
+    GAME_STATE_INGAME,         // main game loop
+    GAME_STATE_DRAW_GAMEOVER,  // intermediate state used to draw "Game Over" once
+    GAME_STATE_GAMEOVER,       // waiting for user input "Start" button
+    GAME_STATE_DRAW_WON,       // intermediate state used to draw "Game Won" once
+    GAME_STATE_WON             // waiting for user input "Start" button
 } game_state_t;
 
 game_state_t state = GAME_STATE_DRAW_START;
 
 __code uint8_t asteroid_bitmap_0[] = {
+    0b11000000,
+    0b11000000,
+};
+
+__code uint8_t asteroid_bitmap_1[] = {
     0b00100000,
     0b01100000,
     0b11100000,
 };
 
-__code uint8_t asteroid_bitmap_1[] = {
+__code uint8_t asteroid_bitmap_2[] = {
     0b00110000,
     0b01110000,
     0b11100000,
     0b01000000,
 };
 
-__code uint8_t asteroid_bitmap_2[] = {
+__code uint8_t asteroid_bitmap_3[] = {
     0b01110000,
     0b11111000,
     0b11111100,
     0b11111100,
     0b00110000,
-};
-
-__code uint8_t asteroid_bitmap_3[] = {
-    0b11000000,
-    0b11000000,
 };
 
 typedef struct {
@@ -261,7 +273,7 @@ __idata asteroid_type_t asteroid_types[] = {
         .hp     = 1,
         .damage = 1,
         .score  = 1,
-        .bitmap = asteroid_bitmap_3,
+        .bitmap = asteroid_bitmap_0,
     },
     {
         .w      = 3,
@@ -269,7 +281,7 @@ __idata asteroid_type_t asteroid_types[] = {
         .hp     = 1,
         .damage = 1,
         .score  = 1,
-        .bitmap = asteroid_bitmap_0,
+        .bitmap = asteroid_bitmap_1,
     },
     {
         .w      = 4,
@@ -277,7 +289,7 @@ __idata asteroid_type_t asteroid_types[] = {
         .hp     = 2,
         .damage = 1,
         .score  = 2,
-        .bitmap = asteroid_bitmap_1,
+        .bitmap = asteroid_bitmap_2,
     },
     {
         .w      = 6,
@@ -285,23 +297,184 @@ __idata asteroid_type_t asteroid_types[] = {
         .hp     = 3,
         .damage = 2,
         .score  = 3,
-        .bitmap = asteroid_bitmap_2,
+        .bitmap = asteroid_bitmap_3,
     },
 };
 
 typedef struct {
     __idata asteroid_type_t* type;
 
-    int8_t  x;
-    int8_t  y;
-    int8_t  vx;
-    int8_t  vy;
+    // coordinates stored as fixed point. 6 bits integer, 2 bits fractional
+    int8_t x;
+    int8_t y;
+    int8_t vx;
+    int8_t vy;
+
     bool    visible;
     uint8_t hp;
 } asteroid_t;
 
 __idata asteroid_t asteroids[8];
 uint8_t            asteroids_index = 0;
+
+inline uint8_t asteroid_get_color(__idata asteroid_t* asteroid) {
+    switch (asteroid->hp) {
+        case 1:
+            return ORG;
+        case 2:
+            return YEL;
+        default:
+            return BLU;
+    }
+}
+
+/**
+ * Renders the asteroid based on the asteroid's type.
+ * Checks framebuffer array bounds and renders asteroids partially at the edges.
+ *
+ * @return true if any pixels have been rendered
+ */
+bool asteroid_render(__idata asteroid_t* asteroid, uint8_t color) {
+    __idata asteroid_type_t* type = asteroid->type;
+
+    // convert fixed point values to just integer parts
+    int8_t x = Q6_2_TO_INT(asteroid->x);
+    int8_t y = Q6_2_TO_INT(asteroid->y);
+
+    // asteroid bitmap area bounds on screen
+    int8_t x_start = x;
+    int8_t x_end   = x + type->w;
+    int8_t y_start = y;
+    int8_t y_end   = y + type->h;
+
+    // constrain asteroid area to valid framebuffer bounds
+    if (x_start < 0) x_start = 0;
+    if (y_start < 1) y_start = 1;  // first pixel row is reserved to health- and scorebar
+    if (x_end > WIDTH) x_end = WIDTH;
+    if (y_end > HEIGHT) y_end = HEIGHT;
+
+    if (x_start >= x_end || y_start >= y_end) {
+        // asteroid is not visible on screen
+        return false;
+    }
+
+    __code uint8_t* bitmap_ptr = type->bitmap;
+
+    // clip top
+    bitmap_ptr += y_start - y;
+
+    // clip horizontal
+    x = x_start - x;
+
+    // loop variables
+    x_end -= x_start;
+    y_end -= y_start;
+
+    do {
+        uint8_t bitmask = *bitmap_ptr++;
+
+        // clip left
+        if (x) {
+            bitmask <<= x;
+        }
+
+        __xdata uint8_t* f_ptr = framebuffer[y_start++] + x_start;
+
+        uint8_t bits = x_end;
+        do {
+            if (bitmask & BIT7) {
+                *f_ptr = color;
+            }
+            bitmask <<= 1;
+            f_ptr++;
+        } while (--bits > 0);  // djnz loop
+    } while (--y_end > 0);  // djnz loop
+
+    return true;
+}
+
+bool asteroid_hit(__idata asteroid_t* asteroid, int8_t x, int8_t y) {
+    if (!asteroid->visible) return false;
+
+    __idata asteroid_type_t* type = asteroid->type;
+
+    if (INTERSECT_POINT(Q6_2_TO_INT(asteroid->x), Q6_2_TO_INT(asteroid->y), type->w, type->h, x, y)) {
+        asteroid->hp--;
+
+        if (asteroid->hp == 0) {
+            asteroid->visible = false;
+            asteroid_render(asteroid, BLK);
+        }
+        return true;
+    }
+
+    return false;
+}
+
+void asteroid_update(__idata asteroid_t* asteroid) {
+    if (!asteroid->visible) {
+        return;
+    }
+
+    asteroid_render(asteroid, BLK);
+
+    asteroid->x += asteroid->vx;
+    asteroid->y += asteroid->vy;
+
+    if (!asteroid_render(asteroid, asteroid_get_color(asteroid))) {
+        asteroid->visible = false;
+    }
+}
+
+void asteroid_generate(__idata asteroid_t* asteroid) {
+    uint8_t r  = rand();
+    uint8_t r2 = rand();
+
+    asteroid->type = asteroid_types + (r & (BIT0 | BIT1));
+
+    if (r & BIT2) {
+        // right edge
+        asteroid->x = INT_TO_Q6_2(31);
+        asteroid->y = INT_TO_Q6_2((r2 & 0xF) - (asteroid->type->h >> 2));
+
+        asteroid->vx = (r & BIT3) ? -4 : -3;
+
+        if (r & BIT4) {
+            asteroid->vy = 0;
+        } else {
+            asteroid->vy = (r & BIT5) ? -1 : 1;
+        }
+    } else {
+        // top or bottom edge
+        asteroid->x = INT_TO_Q6_2(15 + (r2 & 0x0F));
+
+        asteroid->vx = (r & BIT3) ? -3 : -2;
+
+        if (r & BIT4) {
+            // top edge
+            asteroid->y  = INT_TO_Q6_2(2 - asteroid->type->h);
+            asteroid->vy = (r & BIT5) ? 1 : 2;
+        } else {
+            // bottom egde
+            asteroid->y  = INT_TO_Q6_2(15);
+            asteroid->vy = (r & BIT5) ? -1 : -2;
+        }
+    }
+
+    asteroid->visible = true;
+    asteroid->hp      = asteroid->type->hp;
+}
+
+void asteroid_spawn() {
+    static uint16_t last_asteroid_tick = 0;
+    if (tick - last_asteroid_tick > 100) {
+        asteroid_generate(asteroids + asteroids_index);
+        asteroids_index++;
+        if (asteroids_index >= 8) asteroids_index = 0;
+
+        last_asteroid_tick = tick;
+    }
+}
 
 typedef struct {
     uint8_t x;
@@ -312,15 +485,9 @@ typedef struct {
 
 spaceship_t spaceship;
 
-typedef struct {
-    uint8_t x;
-    uint8_t y;
-    bool    visible;
-} laser_t;
-
-__idata laser_t laser[8];
-uint8_t         laser_index = 0;
-
+/**
+ * Checks if the space is currently intersecting with the given asteroid
+ */
 bool spaceship_checkhit(__idata asteroid_t* asteroid) {
     if (!asteroid->visible) {
         return false;
@@ -331,6 +498,9 @@ bool spaceship_checkhit(__idata asteroid_t* asteroid) {
     return INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroid->x >> 2, asteroid->y >> 2, type->w, type->h);
 }
 
+/**
+ * Handles an asteroid hitting the spaceship
+ */
 void spaceship_hit(__idata asteroid_t* asteroid) {
     __idata asteroid_type_t* type = asteroid->type;
 
@@ -342,163 +512,56 @@ void spaceship_hit(__idata asteroid_t* asteroid) {
     spaceship.hp -= type->damage;
 }
 
-inline bool fits_on_screen(int8_t x, int8_t y, int8_t w, int8_t h) {
-    return (x + w >= 0) && (x < WIDTH) && (y + h >= 0) && (y <= HEIGHT);
-}
-
-bool render_asteroid_shape(__idata asteroid_t* asteroid, uint8_t color) {
-    __idata asteroid_type_t* type = asteroid->type;
-
-    int8_t x = asteroid->x >> 2;
-    int8_t y = asteroid->y >> 2;
-
-    // asteroid bitmap bounds
-    int8_t sx = x;
-    int8_t ex = x + type->w;
-    int8_t sy = y;
-    int8_t ey = y + type->h;
-
-    // apply framebuffer bounds
-    if (sx < 0) sx = 0;
-    if (sy < 1) sy = 1;
-    if (ex > WIDTH) ex = WIDTH;
-    if (ey > HEIGHT) ey = HEIGHT;
-
-    // asteroid is not in frame
-    if (sx >= ex || sy >= ey) {
-        return false;
+void spaceship_clear() {
+    if (framebuffer[spaceship.y][spaceship.x] == WHT) {
+        framebuffer[spaceship.y][spaceship.x] = WHT;
     }
-
-    __code uint8_t* bitmap = type->bitmap;
-
-    // clip top
-    bitmap += sy - y;
-
-    // clip horizontal
-    x = sx - x;
-
-    // loop variables
-    ex -= sx;
-    ey -= sy;
-    do {
-        uint8_t bitmask = *bitmap++;
-
-        if (x) {
-            bitmask <<= x;
-        }
-
-        __xdata uint8_t* f_ptr = framebuffer[sy++] + sx;
-
-        uint8_t bits = ex;
-        do {
-            if (bitmask & 0x80) {
-                *f_ptr = color;
-            }
-            bitmask <<= 1;
-            f_ptr++;
-        } while (--bits > 0);
-    } while (--ey > 0);
-
-    return true;
-}
-
-void render_asteroid(__idata asteroid_t* asteroid) {
-    if (!asteroid->visible) {
-        return;
+    if (framebuffer[spaceship.y][spaceship.x + 1] == WHT) {
+        framebuffer[spaceship.y][spaceship.x + 1] = WHT;
     }
-    render_asteroid_shape(asteroid, BLK);
-    asteroid->x += asteroid->vx;
-    asteroid->y += asteroid->vy;
-
-    uint8_t color;
-
-    switch (asteroid->hp) {
-        case 1: {
-            color = ORG;
-            break;
-        }
-        case 2: {
-            color = YEL;
-            break;
-        }
-        default: {
-            color = BLU;
-            break;
-        }
+    if (framebuffer[spaceship.y - 1][spaceship.x] == WHT) {
+        framebuffer[spaceship.y - 1][spaceship.x] = WHT;
     }
-
-    if (!render_asteroid_shape(asteroid, color)) {
-        asteroid->visible = false;
+    if (framebuffer[spaceship.y + 1][spaceship.x] == WHT) {
+        framebuffer[spaceship.y + 1][spaceship.x] = WHT;
     }
 }
 
-bool asteroid_checkhit(__idata asteroid_t* asteroid, int8_t x, int8_t y) {
-    if (!asteroid->visible) return false;
-
-    __idata asteroid_type_t* type = asteroid->type;
-
-    return INTERSECT_POINT(asteroid->x >> 2, asteroid->y >> 2, type->w, type->h, x, y);
+void spaceship_render() {
+    framebuffer[spaceship.y][spaceship.x]     = WHT;
+    framebuffer[spaceship.y][spaceship.x + 1] = WHT;
+    framebuffer[spaceship.y - 1][spaceship.x] = WHT;
+    framebuffer[spaceship.y + 1][spaceship.x] = WHT;
 }
 
-void asteroid_hit(__idata asteroid_t* asteroid) {
-    __idata asteroid_type_t* type = asteroid->type;
-
-    asteroid->hp--;
-
-    if (asteroid->hp == 0) {
-        spaceship.score += type->score;
-        if (spaceship.score >= 16) {
-            state = GAME_STATE_DRAW_WON;
-        }
-        asteroid->visible = false;
-        render_asteroid_shape(asteroid, BLK);
-    }
-}
-
-void asteroid_spawn(__idata asteroid_t* asteroid) {
-    uint8_t r  = rand();
-    uint8_t r2 = rand();
-
-    asteroid->type = asteroid_types + (r & 0b00000011);
-
-    if (r & 0b00000100) {
-        // right edge
-        asteroid->x = 31 << 2;
-        asteroid->y = ((r2 & 0x3F) - (asteroid->type->h * 2));
-
-        asteroid->vx = (r & 0b00001000) ? -4 : -3;
-
-        if (r & 0b00010000) {
-            asteroid->vy = 0;
-        } else {
-            asteroid->vy = (r & 0b00100000) ? -1 : 1;
-        }
-    } else {
-        // top or bottom edge
-        asteroid->x = 60 + (r2 & 0x3F);
-
-        asteroid->vx = (r & 0b00001000) ? -3 : -2;
-
-        if (r & 0b0001000) {
-            // top edge
-            asteroid->y  = (2 - asteroid->type->h) << 2;
-            asteroid->vy = (r2 & 0x01) ? 1 : 2;
-        } else {
-            // bottom egde
-            asteroid->y  = 15 << 2;
-            asteroid->vy = (r2 & 0x01) ? -1 : -2;
-        }
+void spaceship_update() {
+    if (PRESSED(BTN_UP) && spaceship.y >= 3) {
+        spaceship_clear();
+        spaceship.y -= 1;
     }
 
-    asteroid->visible = true;
-    asteroid->hp      = asteroid->type->hp;
-}
+    if (PRESSED(BTN_DOWN) && spaceship.y <= 13) {
+        spaceship_clear();
+        spaceship.y += 1;
+    }
 
-void render_spaceship() {
-    if (framebuffer[spaceship.y][spaceship.x] != BLK ||
-        framebuffer[spaceship.y][spaceship.x + 1] != BLK ||
-        framebuffer[spaceship.y - 1][spaceship.x] != BLK ||
-        framebuffer[spaceship.y + 1][spaceship.x] != BLK) {
+    if (PRESSED(BTN_RIGHT) && spaceship.x <= 29) {
+        spaceship_clear();
+        spaceship.x += 1;
+    }
+
+    if (PRESSED(BTN_LEFT) && spaceship.x >= 1) {
+        spaceship_clear();
+        spaceship.x -= 1;
+    }
+
+    // asteroids are rendered before spaceship, so we can check pixels
+    bool hit = framebuffer[spaceship.y][spaceship.x] != BLK ||
+               framebuffer[spaceship.y][spaceship.x + 1] != BLK ||
+               framebuffer[spaceship.y - 1][spaceship.x] != BLK ||
+               framebuffer[spaceship.y + 1][spaceship.x] != BLK;
+
+    if (hit) {
         if (spaceship_checkhit(asteroids + 0)) {
             spaceship_hit(asteroids + 0);
         } else if (spaceship_checkhit(asteroids + 1)) {
@@ -518,67 +581,83 @@ void render_spaceship() {
         }
     }
 
-    framebuffer[spaceship.y][spaceship.x]     = WHT;
-    framebuffer[spaceship.y][spaceship.x + 1] = WHT;
-    framebuffer[spaceship.y - 1][spaceship.x] = WHT;
-    framebuffer[spaceship.y + 1][spaceship.x] = WHT;
+    spaceship_render();
 }
 
-void clear_spaceship() {
-    framebuffer[spaceship.y][spaceship.x]     = BLK;
-    framebuffer[spaceship.y][spaceship.x + 1] = BLK;
-    framebuffer[spaceship.y - 1][spaceship.x] = BLK;
-    framebuffer[spaceship.y + 1][spaceship.x] = BLK;
+typedef struct {
+    uint8_t x;
+    uint8_t y;
+    bool    visible;
+} laser_t;
+
+__idata laser_t laser[8];
+uint8_t         laser_index = 0;
+
+void laser_spawn() {
+    if (JUST_PRESSED(BTN_A)) {
+        laser[laser_index].x       = spaceship.x + 2;
+        laser[laser_index].y       = spaceship.y;
+        laser[laser_index].visible = true;
+        laser_index++;
+        if (laser_index >= 8) laser_index = 0;
+    }
 }
 
-void render_laser(__idata laser_t* laser) {
+void laser_update(__idata laser_t* laser) {
     if (!laser->visible) {
         return;
     }
-    framebuffer[laser->y][laser->x] = BLK;
+    // clear previous pixel
+    if (framebuffer[laser->y][laser->x] == RED) {
+        framebuffer[laser->y][laser->x] = BLK;
+    }
+
+    // update laser state
     laser->x++;
     if (laser->x >= 32) {
         laser->visible = 0;
         return;
     }
 
+    // check for collision with asteroid
     if (framebuffer[laser->y][laser->x] != BLK) {
         // we know we hit something, but we need to find the exact asteroid we hit
-        if (asteroid_checkhit(asteroids + 0, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 0);
-        } else if (asteroid_checkhit(asteroids + 1, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 1);
-        } else if (asteroid_checkhit(asteroids + 2, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 2);
-        } else if (asteroid_checkhit(asteroids + 3, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 3);
-        } else if (asteroid_checkhit(asteroids + 4, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 4);
-        } else if (asteroid_checkhit(asteroids + 5, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 5);
-        } else if (asteroid_checkhit(asteroids + 6, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 6);
-        } else if (asteroid_checkhit(asteroids + 7, laser->x, laser->y)) {
-            asteroid_hit(asteroids + 7);
+        if (asteroid_hit(asteroids + 0, laser->x, laser->y)) {
+            spaceship.score += asteroids[0].type->score;
+        } else if (asteroid_hit(asteroids + 1, laser->x, laser->y)) {
+            spaceship.score += asteroids[1].type->score;
+        } else if (asteroid_hit(asteroids + 2, laser->x, laser->y)) {
+            spaceship.score += asteroids[2].type->score;
+        } else if (asteroid_hit(asteroids + 3, laser->x, laser->y)) {
+            spaceship.score += asteroids[3].type->score;
+        } else if (asteroid_hit(asteroids + 4, laser->x, laser->y)) {
+            spaceship.score += asteroids[4].type->score;
+        } else if (asteroid_hit(asteroids + 5, laser->x, laser->y)) {
+            spaceship.score += asteroids[5].type->score;
+        } else if (asteroid_hit(asteroids + 6, laser->x, laser->y)) {
+            spaceship.score += asteroids[6].type->score;
+        } else if (asteroid_hit(asteroids + 7, laser->x, laser->y)) {
+            spaceship.score += asteroids[7].type->score;
+        }
+
+        if (spaceship.score >= 16) {
+            state = GAME_STATE_DRAW_WON;
         }
 
         laser->visible = 0;
         return;
     }
 
+    // render laser
     framebuffer[laser->y][laser->x] = RED;
 }
 
 uint8_t last_rendered_hp = 0xFF;
 
-void render_healthbar() {
+void healthbar_update() {
     if (last_rendered_hp != spaceship.hp) {
         for (uint8_t i = 0; i < 16; i++) {
-            framebuffer[0][i] = BLK;
-        }
-
-        for (uint8_t i = 0; i < spaceship.hp; i++) {
-            framebuffer[0][i] = RED;
+            framebuffer[0][i] = (spaceship.hp > i) ? RED : BLK;
         }
 
         last_rendered_hp = spaceship.hp;
@@ -587,10 +666,14 @@ void render_healthbar() {
 
 uint8_t last_rendered_score = 0xFF;
 
-void render_score() {
+void score_update() {
     if (last_rendered_score != spaceship.score) {
-        for (uint8_t i = 0; i < spaceship.score; i++) {
-            framebuffer[0][31 - i] = GRN;
+        __xdata uint8_t* f_ptr = framebuffer + 16;
+
+        uint8_t inverted_score = 16 - spaceship.score;
+
+        for (uint8_t i = 0; i < 16; i++) {
+            framebuffer[0][i] = (spaceship.score > inverted_score) ? RED : BLK;
         }
 
         last_rendered_score = spaceship.score;
@@ -619,7 +702,11 @@ void game_reset() {
     laser_index = 0;
 }
 
-// Reads NES controller inputs and returns button states as 8-bit bitmask
+/**
+ * Reads NES controller inputs
+ *
+ * @return bitmask of pressed buttons
+ */
 uint8_t read_controller() {
     uint8_t value = 0;
 
@@ -642,12 +729,38 @@ uint8_t read_controller() {
 
         // Read next button and store bit (active low)
         value |= (NES_DATA == 0);
-    } while (--i > 0);
+    } while (--i > 0);  // djnz loop
 
     return value;
 }
 
+void clear_screen() {
+    __xdata uint8_t* f_ptr = framebuffer;
+
+    uint8_t x = WIDTH;
+    do {
+        uint8_t y = HEIGHT;
+        do {
+            *f_ptr++ = BLK;
+        } while (--y > 0);  // djnz loop
+    } while (--x > 0);  // djnz loop
+}
+
 void main() {
+    // set matrix address high byte
+    P2 = 0x40;
+
+    // disable LED
+    LED = 1;
+
+    // reset controller pins to known state
+    NES_LATCH = 0;
+    NES_CLK   = 0;
+
+    // interrupt config
+    EA  = 1;  // enable interrupts
+    ET0 = 1;  // enable timer 0 interrupt
+
     // timer 0 in 16-bit mode
     // timer 1 in 8-bit autoreload mode
     TMOD = M0_0 | M1_1;
@@ -655,31 +768,18 @@ void main() {
     // timer 0 interrupt in 2.5 ms
     TH0 = 0xEF;
     TL0 = 0xB9;
+    TR0 = 1;  // enable timer 0
 
     // timer 1 freerunning 0-255
     TH1 = 0x00;
     TL1 = 0x00;
-
-    // interrupt config
-    EA  = 1;  // enable interrupts
-    ET0 = 1;  // enable timer 0 interrupt
-
-    TR0 = 1;  // enable timer 0
-
-    LED = 1;  // disable LED
-
-    P2 = 0x40;  // matrix address high byte
-
-    NES_LATCH = 0;
-    NES_CLK   = 0;
 
     while (1) {
         // throttle main loop to 20 Hz
         static uint16_t last_render_tick = 0;
         if (tick - last_render_tick < 5) continue;
 
-        static uint8_t last_controller = 0;
-        uint8_t        controller      = read_controller();
+        controller = read_controller();
 
         switch (state) {
             case GAME_STATE_DRAW_START: {
@@ -702,9 +802,9 @@ void main() {
                 break;
             }
             case GAME_STATE_START: {
-                if ((controller & BTN_START) && !(last_controller & BTN_START)) {
+                if (JUST_PRESSED(BTN_START)) {
                     // use timer 1 low byte as random seed
-                    // timer 0 can't be used, it's synced with the game loop and won't be random enough
+                    // timer 0 can't be used, it's value is synced with the game loop and won't be random enough
                     seed(TL1);
 
                     TR1 = 0;  // disable timer 1
@@ -716,64 +816,30 @@ void main() {
                 break;
             }
             case GAME_STATE_INGAME: {
-                if ((controller & BTN_UP) && spaceship.y >= 3) {
-                    clear_spaceship();
-                    spaceship.y -= 1;
-                }
+                asteroid_spawn();
+                asteroid_update(asteroids + 0);
+                asteroid_update(asteroids + 1);
+                asteroid_update(asteroids + 2);
+                asteroid_update(asteroids + 3);
+                asteroid_update(asteroids + 4);
+                asteroid_update(asteroids + 5);
+                asteroid_update(asteroids + 6);
+                asteroid_update(asteroids + 7);
 
-                if ((controller & BTN_DOWN) && spaceship.y <= 13) {
-                    clear_spaceship();
-                    spaceship.y += 1;
-                }
+                spaceship_update();
 
-                if ((controller & BTN_RIGHT) && spaceship.x <= 29) {
-                    clear_spaceship();
-                    spaceship.x += 1;
-                }
+                laser_spawn();
+                laser_update(laser + 0);
+                laser_update(laser + 1);
+                laser_update(laser + 2);
+                laser_update(laser + 3);
+                laser_update(laser + 4);
+                laser_update(laser + 5);
+                laser_update(laser + 6);
+                laser_update(laser + 7);
 
-                if ((controller & BTN_LEFT) && spaceship.x >= 1) {
-                    clear_spaceship();
-                    spaceship.x -= 1;
-                }
-
-                static uint16_t last_asteroid_tick = 0;
-                if (tick - last_asteroid_tick > 100) {
-                    asteroid_spawn(asteroids + asteroids_index);
-                    asteroids_index++;
-                    if (asteroids_index >= 8) asteroids_index = 0;
-
-                    last_asteroid_tick = tick;
-                }
-
-                render_asteroid(asteroids + 0);
-                render_asteroid(asteroids + 1);
-                render_asteroid(asteroids + 2);
-                render_asteroid(asteroids + 3);
-                render_asteroid(asteroids + 4);
-                render_asteroid(asteroids + 5);
-                render_asteroid(asteroids + 6);
-                render_asteroid(asteroids + 7);
-
-                if ((controller & BTN_A) && !(last_controller & BTN_A)) {
-                    laser[laser_index].x       = spaceship.x + 2;
-                    laser[laser_index].y       = spaceship.y;
-                    laser[laser_index].visible = true;
-                    laser_index++;
-                    if (laser_index >= 8) laser_index = 0;
-                }
-
-                render_laser(laser + 0);
-                render_laser(laser + 1);
-                render_laser(laser + 2);
-                render_laser(laser + 3);
-                render_laser(laser + 4);
-                render_laser(laser + 5);
-                render_laser(laser + 6);
-                render_laser(laser + 7);
-
-                render_healthbar();
-                render_score();
-                render_spaceship();
+                healthbar_update();
+                score_update();
 
                 break;
             }
@@ -794,7 +860,7 @@ void main() {
                 break;
             }
             case GAME_STATE_GAMEOVER: {
-                if ((controller & BTN_START) && !(last_controller & BTN_START)) {
+                if (JUST_PRESSED(BTN_START)) {
                     clear_screen();
                     state = GAME_STATE_DRAW_START;
                 }
@@ -817,7 +883,7 @@ void main() {
                 break;
             }
             case GAME_STATE_WON: {
-                if ((controller & BTN_START) && !(last_controller & BTN_START)) {
+                if (JUST_PRESSED(BTN_START)) {
                     clear_screen();
                     state = GAME_STATE_DRAW_START;
                 }
@@ -846,7 +912,7 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     __xdata uint8_t* f_ptr;
 
     // prepare matrix cmd to write line
-    cmd = line | 0x8;
+    cmd = line | BIT3;
 
     // base pointers to matrix and framebuffer
     m_ptr = matrix;
@@ -875,7 +941,7 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
         *m_ptr = cmd;
 
         m_ptr += 8;
-    } while (--i > 0);
+    } while (--i > 0);  // djnz loop
 
     // wrap framebuffer pointer to send row (32 * 8) - 32
     f_ptr += 224;
@@ -900,7 +966,7 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
         *m_ptr = cmd;
 
         m_ptr += 8;
-    } while (--i > 0);
+    } while (--i > 0);  // djnz loop
 
     // advance to next scan line for the next ISR call
     line++;
