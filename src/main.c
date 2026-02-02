@@ -665,7 +665,6 @@ void main() {
     ET0 = 1;  // enable timer 0 interrupt
 
     TR0 = 1;  // enable timer 0
-    TR1 = 1;  // enable timer 1
 
     LED = 1;  // disable LED
 
@@ -684,6 +683,8 @@ void main() {
 
         switch (state) {
             case GAME_STATE_DRAW_START: {
+                TR1 = 1;  // enable timer 1
+
                 clear_screen();
 
                 render_font(font_S, 5, 2, BLU);
@@ -703,8 +704,10 @@ void main() {
             case GAME_STATE_START: {
                 if ((controller & BTN_START) && !(last_controller & BTN_START)) {
                     // use timer 1 low byte as random seed
-                    // timer 0 can't be used, it's synced with the game loop
+                    // timer 0 can't be used, it's synced with the game loop and won't be random enough
                     seed(TL1);
+
+                    TR1 = 0;  // disable timer 1
 
                     clear_screen();
                     game_reset();
