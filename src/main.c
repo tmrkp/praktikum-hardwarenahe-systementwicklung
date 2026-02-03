@@ -198,7 +198,7 @@ typedef struct {
 
 rng_t rng = {0, 0, 0, 1};
 
-inline void seed(uint8_t seed) {
+void seed(uint8_t seed) {
     rng.x = seed;
     rng.y = seed ^ 0xA5;
     rng.z = (seed << 1) | (seed >> 7);
@@ -261,17 +261,16 @@ typedef struct {
     int8_t          w;
     int8_t          h;
     uint8_t         hp;
-    uint8_t         damage;
     uint8_t         score;
     __code uint8_t* bitmap;
 } asteroid_type_t;
 
+// these are constant, but stored in RAM for fast access
 __idata asteroid_type_t asteroid_types[] = {
     {
         .w      = 2,
         .h      = 2,
         .hp     = 1,
-        .damage = 1,
         .score  = 1,
         .bitmap = asteroid_bitmap_0,
     },
@@ -279,7 +278,6 @@ __idata asteroid_type_t asteroid_types[] = {
         .w      = 3,
         .h      = 3,
         .hp     = 1,
-        .damage = 1,
         .score  = 1,
         .bitmap = asteroid_bitmap_1,
     },
@@ -287,16 +285,14 @@ __idata asteroid_type_t asteroid_types[] = {
         .w      = 4,
         .h      = 4,
         .hp     = 2,
-        .damage = 1,
-        .score  = 2,
+        .score  = 1,
         .bitmap = asteroid_bitmap_2,
     },
     {
         .w      = 6,
         .h      = 5,
         .hp     = 3,
-        .damage = 2,
-        .score  = 3,
+        .score  = 2,
         .bitmap = asteroid_bitmap_3,
     },
 };
@@ -314,10 +310,17 @@ typedef struct {
     uint8_t hp;
 } asteroid_t;
 
-__idata asteroid_t asteroids[8];
-uint8_t            asteroids_index = 0;
+#define ASTEROID_COUNT 8
+__idata asteroid_t asteroids[ASTEROID_COUNT];
 
-inline uint8_t asteroid_get_color(__idata asteroid_t* asteroid) {
+#define ASTEROID_SPAWN_DELAY_INIT 300
+#define ASTEROID_SPAWN_DELAY_MIN 40
+#define ASTEROID_SPAWN_DELAY_REDUCE 5
+
+uint16_t asteroid_last_spawn_tick = 0;
+uint16_t asteroid_spawn_delay     = ASTEROID_SPAWN_DELAY_INIT;
+
+uint8_t asteroid_get_color(__idata asteroid_t* asteroid) {
     switch (asteroid->hp) {
         case 1:
             return ORG;
@@ -332,9 +335,11 @@ inline uint8_t asteroid_get_color(__idata asteroid_t* asteroid) {
  * Renders the asteroid based on the asteroid's type.
  * Checks framebuffer array bounds and renders asteroids partially at the edges.
  *
+ * Uses it's own register bank, because this function is complex and called often
+ *
  * @return true if any pixels have been rendered
  */
-bool asteroid_render(__idata asteroid_t* asteroid, uint8_t color) {
+bool asteroid_render(__idata asteroid_t* asteroid, uint8_t color) __using(2) {
     __idata asteroid_type_t* type = asteroid->type;
 
     // convert fixed point values to just integer parts
@@ -393,28 +398,8 @@ bool asteroid_render(__idata asteroid_t* asteroid, uint8_t color) {
     return true;
 }
 
-bool asteroid_hit(__idata asteroid_t* asteroid, int8_t x, int8_t y) {
-    if (!asteroid->visible) return false;
-
-    __idata asteroid_type_t* type = asteroid->type;
-
-    if (INTERSECT_POINT(Q6_2_TO_INT(asteroid->x), Q6_2_TO_INT(asteroid->y), type->w, type->h, x, y)) {
-        asteroid->hp--;
-
-        if (asteroid->hp == 0) {
-            asteroid->visible = false;
-            asteroid_render(asteroid, BLK);
-        }
-        return true;
-    }
-
-    return false;
-}
-
 void asteroid_update(__idata asteroid_t* asteroid) {
-    if (!asteroid->visible) {
-        return;
-    }
+    if (!asteroid->visible) return;
 
     asteroid_render(asteroid, BLK);
 
@@ -426,53 +411,71 @@ void asteroid_update(__idata asteroid_t* asteroid) {
     }
 }
 
-inline void asteroid_generate(__idata asteroid_t* asteroid) {
+/**
+ * configures/generates a new asteroid based on random numbers
+ */
+void asteroid_generate(__idata asteroid_t* asteroid) {
     uint8_t r  = rand();
     uint8_t r2 = rand();
 
     asteroid->type = asteroid_types + (r & (BIT0 | BIT1));
 
     if (r & BIT2) {
-        // right edge
+        // spawn at right edge of screen
         asteroid->x = INT_TO_Q6_2(31);
         asteroid->y = INT_TO_Q6_2((r2 & 0xF) - (asteroid->type->h >> 2));
 
+        // choose speed
         asteroid->vx = (r & BIT3) ? -4 : -3;
 
+        // choose direction
         if (r & BIT4) {
+            // moves straight left
             asteroid->vy = 0;
         } else {
+            // moves slightly diagonal
             asteroid->vy = (r & BIT5) ? -1 : 1;
         }
     } else {
-        // top or bottom edge
+        // spawn at top or bottom edge of screen
         asteroid->x = INT_TO_Q6_2(15 + (r2 & 0x0F));
 
         asteroid->vx = (r & BIT3) ? -3 : -2;
 
         if (r & BIT4) {
-            // top edge
+            // spawn at top edge of screen, velocity must be downwards (positive)
             asteroid->y  = INT_TO_Q6_2(2 - asteroid->type->h);
             asteroid->vy = (r & BIT5) ? 1 : 2;
         } else {
-            // bottom egde
+            // spawn at bottom egde of screen. velocity must be upwards (negative)
             asteroid->y  = INT_TO_Q6_2(15);
             asteroid->vy = (r & BIT5) ? -1 : -2;
         }
     }
 
-    asteroid->visible = true;
-    asteroid->hp      = asteroid->type->hp;
+    asteroid->hp = asteroid->type->hp;
 }
 
-inline void asteroid_spawn() {
-    static uint16_t last_asteroid_tick = 0;
-    if (tick - last_asteroid_tick > 100) {
-        asteroid_generate(asteroids + asteroids_index);
-        asteroids_index++;
-        if (asteroids_index >= 8) asteroids_index = 0;
+void asteroid_spawn() {
+    if ((tick - asteroid_last_spawn_tick) > asteroid_spawn_delay) {
+        // find unused asteroid using loop to keep visible asteroids in the
+        // front of the array. this allows for early return in collision check loops
+        __idata asteroid_t* asteroid_ptr = asteroids;
+        do {
+            if (!asteroid_ptr->visible) {
+                asteroid_generate(asteroid_ptr);
+                asteroid_ptr->visible = true;
+                break;
+            }
+            asteroid_ptr++;
+        } while (asteroid_ptr < asteroids + ASTEROID_COUNT);
 
-        last_asteroid_tick = tick;
+        asteroid_last_spawn_tick = tick;
+
+        // decrease spawn rate of asteroid to increase difficulity
+        if (asteroid_spawn_delay > ASTEROID_SPAWN_DELAY_MIN) {
+            asteroid_spawn_delay -= ASTEROID_SPAWN_DELAY_REDUCE;
+        }
     }
 }
 
@@ -486,127 +489,138 @@ typedef struct {
 spaceship_t spaceship;
 
 /**
- * Checks if the space is currently intersecting with the given asteroid
+ * Checks and handles if the spaceship was hit by a given asteroid.
  */
-bool spaceship_checkhit(__idata asteroid_t* asteroid) {
+bool spaceship_hit(__idata asteroid_t* asteroid) {
     if (!asteroid->visible) {
         return false;
     }
 
     __idata asteroid_type_t* type = asteroid->type;
 
-    return INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroid->x >> 2, asteroid->y >> 2, type->w, type->h);
-}
-
-/**
- * Handles an asteroid hitting the spaceship
- */
-void spaceship_hit(__idata asteroid_t* asteroid) {
-    __idata asteroid_type_t* type = asteroid->type;
-
-    if (spaceship.hp <= type->damage) {
-        state = GAME_STATE_DRAW_GAMEOVER;
-        return;
+    if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroid->x >> 2, asteroid->y >> 2, type->w, type->h)) {
+        if (spaceship.hp <= 1) {
+            state = GAME_STATE_DRAW_GAMEOVER;
+        }
+        spaceship.hp -= 1;
+        return true;
     }
 
-    spaceship.hp -= type->damage;
+    return false;
 }
 
 void spaceship_clear() {
+    // check if pixel is white, because it might already be drawn by an asteroid
     if (framebuffer[spaceship.y][spaceship.x] == WHT) {
-        framebuffer[spaceship.y][spaceship.x] = WHT;
+        framebuffer[spaceship.y][spaceship.x] = BLK;
     }
     if (framebuffer[spaceship.y][spaceship.x + 1] == WHT) {
-        framebuffer[spaceship.y][spaceship.x + 1] = WHT;
+        framebuffer[spaceship.y][spaceship.x + 1] = BLK;
     }
     if (framebuffer[spaceship.y - 1][spaceship.x] == WHT) {
-        framebuffer[spaceship.y - 1][spaceship.x] = WHT;
+        framebuffer[spaceship.y - 1][spaceship.x] = BLK;
     }
     if (framebuffer[spaceship.y + 1][spaceship.x] == WHT) {
-        framebuffer[spaceship.y + 1][spaceship.x] = WHT;
+        framebuffer[spaceship.y + 1][spaceship.x] = BLK;
     }
 }
 
-inline void spaceship_render() {
+void spaceship_render() {
     framebuffer[spaceship.y][spaceship.x]     = WHT;
     framebuffer[spaceship.y][spaceship.x + 1] = WHT;
     framebuffer[spaceship.y - 1][spaceship.x] = WHT;
     framebuffer[spaceship.y + 1][spaceship.x] = WHT;
 }
 
-inline void spaceship_update() {
+/**
+ * @return true if the spaceship has been hit
+ */
+bool spaceship_update() {
+    spaceship_clear();
+
     if (PRESSED(BTN_UP) && spaceship.y >= 3) {
-        spaceship_clear();
         spaceship.y -= 1;
     }
 
     if (PRESSED(BTN_DOWN) && spaceship.y <= 13) {
-        spaceship_clear();
         spaceship.y += 1;
     }
 
     if (PRESSED(BTN_RIGHT) && spaceship.x <= 29) {
-        spaceship_clear();
         spaceship.x += 1;
     }
 
     if (PRESSED(BTN_LEFT) && spaceship.x >= 1) {
-        spaceship_clear();
         spaceship.x -= 1;
     }
 
-    // asteroids are rendered before spaceship, so we can check pixels
+    // asteroids are rendered before spaceship, so we can check pixels to detect collision
     bool hit = framebuffer[spaceship.y][spaceship.x] != BLK ||
                framebuffer[spaceship.y][spaceship.x + 1] != BLK ||
                framebuffer[spaceship.y - 1][spaceship.x] != BLK ||
                framebuffer[spaceship.y + 1][spaceship.x] != BLK;
 
     if (hit) {
-        if (spaceship_checkhit(asteroids + 0)) {
-            spaceship_hit(asteroids + 0);
-        } else if (spaceship_checkhit(asteroids + 1)) {
-            spaceship_hit(asteroids + 1);
-        } else if (spaceship_checkhit(asteroids + 2)) {
-            spaceship_hit(asteroids + 2);
-        } else if (spaceship_checkhit(asteroids + 3)) {
-            spaceship_hit(asteroids + 3);
-        } else if (spaceship_checkhit(asteroids + 4)) {
-            spaceship_hit(asteroids + 4);
-        } else if (spaceship_checkhit(asteroids + 5)) {
-            spaceship_hit(asteroids + 5);
-        } else if (spaceship_checkhit(asteroids + 6)) {
-            spaceship_hit(asteroids + 6);
-        } else if (spaceship_checkhit(asteroids + 7)) {
-            spaceship_hit(asteroids + 7);
-        }
+        // we know we hit something, but we need to find the exact asteroid we hit
+        __idata asteroid_t* asteroid_ptr = asteroids;
+        do {
+            if (spaceship_hit(asteroid_ptr)) {
+                break;
+            }
+            asteroid_ptr++;
+        } while (asteroid_ptr < asteroids + ASTEROID_COUNT);
     }
 
     spaceship_render();
+
+    return hit;
 }
 
 typedef struct {
-    uint8_t x;
-    uint8_t y;
-    bool    visible;
+    int8_t x;
+    int8_t y;
+    bool   visible;
 } laser_t;
 
-__idata laser_t laser[8];
-uint8_t         laser_index = 0;
+#define LASER_COUNT 8
 
-inline void laser_spawn() {
+__idata laser_t  lasers[LASER_COUNT];
+__idata laser_t* laser_next = lasers;
+
+void laser_spawn() {
     if (JUST_PRESSED(BTN_A)) {
-        laser[laser_index].x       = spaceship.x + 2;
-        laser[laser_index].y       = spaceship.y;
-        laser[laser_index].visible = true;
-        laser_index++;
-        if (laser_index >= 8) laser_index = 0;
+        laser_next->x       = spaceship.x + 2;
+        laser_next->y       = spaceship.y;
+        laser_next->visible = true;
+        laser_next++;
+        if (laser_next >= lasers + LASER_COUNT) {
+            laser_next = lasers;
+        }
     }
 }
 
-void laser_update(__idata laser_t* laser) {
-    if (!laser->visible) {
-        return;
+bool laser_hit(__idata asteroid_t* asteroid, __idata laser_t* laser) {
+    if (!asteroid->visible) return false;
+
+    __idata asteroid_type_t* type = asteroid->type;
+
+    if (INTERSECT_POINT(Q6_2_TO_INT(asteroid->x), Q6_2_TO_INT(asteroid->y), type->w, type->h, laser->x, laser->y)) {
+        asteroid->hp--;
+
+        if (asteroid->hp == 0) {
+            asteroid->visible = false;
+            asteroid_render(asteroid, BLK);
+            spaceship.score += type->score;
+        }
+        return true;
     }
+
+    return false;
+}
+
+void laser_update(__idata laser_t* laser) {
+    if (!laser->visible) return;
+
     // clear previous pixel
     if (framebuffer[laser->y][laser->x] == RED) {
         framebuffer[laser->y][laser->x] = BLK;
@@ -622,23 +636,13 @@ void laser_update(__idata laser_t* laser) {
     // check for collision with asteroid
     if (framebuffer[laser->y][laser->x] != BLK) {
         // we know we hit something, but we need to find the exact asteroid we hit
-        if (asteroid_hit(asteroids + 0, laser->x, laser->y)) {
-            spaceship.score += asteroids[0].type->score;
-        } else if (asteroid_hit(asteroids + 1, laser->x, laser->y)) {
-            spaceship.score += asteroids[1].type->score;
-        } else if (asteroid_hit(asteroids + 2, laser->x, laser->y)) {
-            spaceship.score += asteroids[2].type->score;
-        } else if (asteroid_hit(asteroids + 3, laser->x, laser->y)) {
-            spaceship.score += asteroids[3].type->score;
-        } else if (asteroid_hit(asteroids + 4, laser->x, laser->y)) {
-            spaceship.score += asteroids[4].type->score;
-        } else if (asteroid_hit(asteroids + 5, laser->x, laser->y)) {
-            spaceship.score += asteroids[5].type->score;
-        } else if (asteroid_hit(asteroids + 6, laser->x, laser->y)) {
-            spaceship.score += asteroids[6].type->score;
-        } else if (asteroid_hit(asteroids + 7, laser->x, laser->y)) {
-            spaceship.score += asteroids[7].type->score;
-        }
+        __idata asteroid_t* asteroid_ptr = asteroids;
+        do {
+            if (laser_hit(asteroid_ptr, laser)) {
+                break;
+            }
+            asteroid_ptr++;
+        } while (asteroid_ptr < asteroids + ASTEROID_COUNT);
 
         if (spaceship.score >= 16) {
             state = GAME_STATE_DRAW_WON;
@@ -654,52 +658,33 @@ void laser_update(__idata laser_t* laser) {
 
 uint8_t last_rendered_hp = 0xFF;
 
-inline void healthbar_update() {
-    if (last_rendered_hp != spaceship.hp) {
-        for (uint8_t i = 0; i < 16; i++) {
-            framebuffer[0][i] = (spaceship.hp > i) ? RED : BLK;
-        }
-
-        last_rendered_hp = spaceship.hp;
+void healthbar_update() {
+    for (uint8_t i = 0; i < 16; i++) {
+        framebuffer[0][i] = (spaceship.hp > i) ? RED : BLK;
     }
 }
 
-uint8_t last_rendered_score = 0xFF;
-
-inline void score_update() {
-    if (last_rendered_score != spaceship.score) {
-        __xdata uint8_t* f_ptr = framebuffer + 16;
-
-        uint8_t inverted_score = 16 - spaceship.score;
-
-        for (uint8_t i = 0; i < 16; i++) {
-            framebuffer[0][i] = (spaceship.score > inverted_score) ? RED : BLK;
-        }
-
-        last_rendered_score = spaceship.score;
+void score_update() {
+    for (uint8_t i = 0; i < 16; i++) {
+        framebuffer[0][31 - i] = (spaceship.score > i) ? GRN : BLK;
     }
 }
 
-inline void game_reset() {
+void game_reset() {
     spaceship.x     = 3;
     spaceship.y     = 8;
     spaceship.hp    = 16;
     spaceship.score = 0;
 
-    last_rendered_hp    = 0xFF;
-    last_rendered_score = 0xFF;
+    asteroid_spawn_delay = ASTEROID_SPAWN_DELAY_INIT;
 
-    for (uint8_t i = 0; i < 8; i++) {
+    for (uint8_t i = 0; i < ASTEROID_COUNT; i++) {
         asteroids[i].visible = false;
     }
 
-    asteroids_index = 0;
-
-    for (uint8_t i = 0; i < 8; i++) {
-        laser[i].visible = false;
+    for (uint8_t i = 0; i < LASER_COUNT; i++) {
+        lasers[i].visible = false;
     }
-
-    laser_index = 0;
 }
 
 /**
@@ -707,7 +692,7 @@ inline void game_reset() {
  *
  * @return bitmask of pressed buttons
  */
-inline uint8_t read_controller() {
+uint8_t read_controller() {
     uint8_t value = 0;
 
     // Pulse Latch to sample buttons states in shift register
@@ -817,26 +802,22 @@ void main() {
             }
             case GAME_STATE_INGAME: {
                 asteroid_spawn();
-                asteroid_update(asteroids + 0);
-                asteroid_update(asteroids + 1);
-                asteroid_update(asteroids + 2);
-                asteroid_update(asteroids + 3);
-                asteroid_update(asteroids + 4);
-                asteroid_update(asteroids + 5);
-                asteroid_update(asteroids + 6);
-                asteroid_update(asteroids + 7);
+
+                __idata asteroid_t* asteroid_ptr = asteroids;
+                do {
+                    asteroid_update(asteroid_ptr);
+                    asteroid_ptr++;
+                } while (asteroid_ptr < asteroids + ASTEROID_COUNT);
 
                 spaceship_update();
 
                 laser_spawn();
-                laser_update(laser + 0);
-                laser_update(laser + 1);
-                laser_update(laser + 2);
-                laser_update(laser + 3);
-                laser_update(laser + 4);
-                laser_update(laser + 5);
-                laser_update(laser + 6);
-                laser_update(laser + 7);
+
+                __idata laser_t* laser_ptr = lasers;
+                do {
+                    laser_update(laser_ptr);
+                    laser_ptr++;
+                } while (laser_ptr < lasers + LASER_COUNT);
 
                 healthbar_update();
                 score_update();
