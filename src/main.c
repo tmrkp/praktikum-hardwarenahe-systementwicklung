@@ -560,6 +560,8 @@ bool spaceship_update() {
                framebuffer[spaceship.y - 1][spaceship.x] != BLK ||
                framebuffer[spaceship.y + 1][spaceship.x] != BLK;
 
+    spaceship_render();
+
     if (hit) {
         // we know we hit something, but we need to find the exact asteroid we hit
         __idata asteroid_t* asteroid_ptr = asteroids;
@@ -570,8 +572,6 @@ bool spaceship_update() {
             asteroid_ptr++;
         } while (asteroid_ptr < asteroids + ASTEROID_COUNT);
     }
-
-    spaceship_render();
 
     return hit;
 }
@@ -592,6 +592,7 @@ void laser_spawn() {
         laser_next->x       = spaceship.x + 2;
         laser_next->y       = spaceship.y;
         laser_next->visible = true;
+
         laser_next++;
         if (laser_next >= lasers + LASER_COUNT) {
             laser_next = lasers;
@@ -599,6 +600,7 @@ void laser_spawn() {
     }
 }
 
+// checks and handles a laser hitting an asteroid
 bool laser_hit(__idata asteroid_t* asteroid, __idata laser_t* laser) {
     if (!asteroid->visible) return false;
 
@@ -621,7 +623,7 @@ bool laser_hit(__idata asteroid_t* asteroid, __idata laser_t* laser) {
 void laser_update(__idata laser_t* laser) {
     if (!laser->visible) return;
 
-    // clear previous pixel
+    // clear previous pixel, don't clear previously drawn asteroids
     if (framebuffer[laser->y][laser->x] == RED) {
         framebuffer[laser->y][laser->x] = BLK;
     }
@@ -633,7 +635,7 @@ void laser_update(__idata laser_t* laser) {
         return;
     }
 
-    // check for collision with asteroid
+    // check for collision with asteroid based on pixels
     if (framebuffer[laser->y][laser->x] != BLK) {
         // we know we hit something, but we need to find the exact asteroid we hit
         __idata asteroid_t* asteroid_ptr = asteroids;
@@ -648,15 +650,13 @@ void laser_update(__idata laser_t* laser) {
             state = GAME_STATE_DRAW_WON;
         }
 
-        laser->visible = 0;
+        laser->visible = false;
         return;
     }
 
     // render laser
     framebuffer[laser->y][laser->x] = RED;
 }
-
-uint8_t last_rendered_hp = 0xFF;
 
 void healthbar_update() {
     for (uint8_t i = 0; i < 16; i++) {
@@ -689,7 +689,6 @@ void game_reset() {
 
 /**
  * Reads NES controller inputs
- *
  * @return bitmask of pressed buttons
  */
 uint8_t read_controller() {
@@ -768,7 +767,7 @@ void main() {
 
         switch (state) {
             case GAME_STATE_DRAW_START: {
-                TR1 = 1;  // enable timer 1
+                TR1 = 1;  // enable timer 1 for random seed sampling.
 
                 clear_screen();
 
@@ -788,11 +787,11 @@ void main() {
             }
             case GAME_STATE_START: {
                 if (JUST_PRESSED(BTN_START)) {
-                    // use timer 1 low byte as random seed
+                    // use timer 1 low byte as random seed. together with the user input it's essentially random.
                     // timer 0 can't be used, it's value is synced with the game loop and won't be random enough
                     seed(TL1);
 
-                    TR1 = 0;  // disable timer 1
+                    TR1 = 0;  // disable timer 1. only used for random seed sampling.
 
                     clear_screen();
                     game_reset();
@@ -801,8 +800,13 @@ void main() {
                 break;
             }
             case GAME_STATE_INGAME: {
+                // The order is important here. Asteroids must be rendered first, so that
+                // lasers and the spaceship can check for collisions based on the
+                // framebuffer.
+
                 asteroid_spawn();
 
+                // update all asteroids
                 __idata asteroid_t* asteroid_ptr = asteroids;
                 do {
                     asteroid_update(asteroid_ptr);
@@ -813,12 +817,14 @@ void main() {
 
                 laser_spawn();
 
+                // update all lasers
                 __idata laser_t* laser_ptr = lasers;
                 do {
                     laser_update(laser_ptr);
                     laser_ptr++;
                 } while (laser_ptr < lasers + LASER_COUNT);
 
+                // update UI
                 healthbar_update();
                 score_update();
 
