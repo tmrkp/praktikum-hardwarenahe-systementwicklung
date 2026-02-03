@@ -62,6 +62,8 @@ __xdata uint8_t framebuffer[HEIGHT][WIDTH];
 
 // Pointer to external LED Matrix
 // highest address is 16*7+8 = 120, so 8-bit addressing mode is sufficient
+// the low address byte is stored in this pointer
+// the high addres byte is stored in P2 and set at the start of main()
 __pdata uint8_t* matrix = (__pdata uint8_t*) 0x00;
 
 // tick counter for game code timings (one tick every 10 ms)
