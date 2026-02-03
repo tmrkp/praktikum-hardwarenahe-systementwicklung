@@ -78,12 +78,12 @@ uint8_t controller      = 0;
 #define JUST_PRESSED(btn) ((controller & btn) && !(last_controller & btn))
 
 // checks if two areas intersect anywhere
-#define INTERSECT_AREA(x1, y1, w1, h1, x2, y2, w2, h2) ((y2) + (h2) >= (y1) && (y2) < (y1) + (h1) && (x2) + (w2) >= (x1) && (x2) < (x1) + (w1))
+#define INTERSECT_AREAS(x1, y1, w1, h1, x2, y2, w2, h2) ((y2) + (h2) >= (y1) && (y2) < (y1) + (h1) && (x2) + (w2) >= (x1) && (x2) < (x1) + (w1))
 
 // checks if a point is within an area
-#define INTERSECT_POINT(x1, y1, w1, h1, x2, y2) ((x2) >= (x1) && (x2) < (x1) + (w1) && (y2) >= (y1) && (y2) < (y1) + (h1))
+#define POINT_IN_AREA(x1, y1, w1, h1, x2, y2) ((x2) >= (x1) && (x2) < (x1) + (w1) && (y2) >= (y1) && (y2) < (y1) + (h1))
 
-__code uint8_t font_A[] = {
+__code const uint8_t font_A[] = {
     0b01100000,
     0b10010000,
     0b11110000,
@@ -91,7 +91,7 @@ __code uint8_t font_A[] = {
     0b10010000,
 };
 
-__code uint8_t font_E[] = {
+__code const uint8_t font_E[] = {
     0b11110000,
     0b10000000,
     0b11100000,
@@ -99,7 +99,7 @@ __code uint8_t font_E[] = {
     0b11110000,
 };
 
-__code uint8_t font_G[] = {
+__code const uint8_t font_G[] = {
     0b01110000,
     0b10000000,
     0b10110000,
@@ -107,7 +107,7 @@ __code uint8_t font_G[] = {
     0b01110000,
 };
 
-__code uint8_t font_M[] = {
+__code const uint8_t font_M[] = {
     0b10001000,
     0b11011000,
     0b10101000,
@@ -115,7 +115,7 @@ __code uint8_t font_M[] = {
     0b10001000,
 };
 
-__code uint8_t font_N[] = {
+__code const uint8_t font_N[] = {
     0b10001000,
     0b11001000,
     0b10101000,
@@ -123,7 +123,7 @@ __code uint8_t font_N[] = {
     0b10001000,
 };
 
-__code uint8_t font_O[] = {
+__code const uint8_t font_O[] = {
     0b01100000,
     0b10010000,
     0b10010000,
@@ -131,7 +131,7 @@ __code uint8_t font_O[] = {
     0b01100000,
 };
 
-__code uint8_t font_R[] = {
+__code const uint8_t font_R[] = {
     0b11100000,
     0b10010000,
     0b11100000,
@@ -139,7 +139,7 @@ __code uint8_t font_R[] = {
     0b10010000,
 };
 
-__code uint8_t font_S[] = {
+__code const uint8_t font_S[] = {
     0b01110000,
     0b10000000,
     0b01100000,
@@ -147,7 +147,7 @@ __code uint8_t font_S[] = {
     0b11100000,
 };
 
-__code uint8_t font_T[] = {
+__code const uint8_t font_T[] = {
     0b11100000,
     0b01000000,
     0b01000000,
@@ -155,7 +155,7 @@ __code uint8_t font_T[] = {
     0b01000000,
 };
 
-__code uint8_t font_V[] = {
+__code const uint8_t font_V[] = {
     0b10100000,
     0b10100000,
     0b10100000,
@@ -163,7 +163,7 @@ __code uint8_t font_V[] = {
     0b01000000,
 };
 
-__code uint8_t font_W[] = {
+__code const uint8_t font_W[] = {
     0b10101000,
     0b10101000,
     0b10101000,
@@ -172,7 +172,7 @@ __code uint8_t font_W[] = {
 };
 
 // renders a single letter. does not check for framebuffer array bounds.
-void render_font(__code uint8_t* bitmap, uint8_t x0, uint8_t y, uint8_t color) {
+void render_font(__code const uint8_t* bitmap, uint8_t x0, uint8_t y, uint8_t color) {
     uint8_t height = 5;
     do {
         uint8_t bitmask = *bitmap++;
@@ -231,25 +231,25 @@ typedef enum {
 
 game_state_t state = GAME_STATE_DRAW_START;
 
-__code uint8_t asteroid_bitmap_0[] = {
+__code const uint8_t asteroid_bitmap_0[] = {
     0b11000000,
     0b11000000,
 };
 
-__code uint8_t asteroid_bitmap_1[] = {
+__code const uint8_t asteroid_bitmap_1[] = {
     0b00100000,
     0b01100000,
     0b11100000,
 };
 
-__code uint8_t asteroid_bitmap_2[] = {
+__code const uint8_t asteroid_bitmap_2[] = {
     0b00110000,
     0b01110000,
     0b11100000,
     0b01000000,
 };
 
-__code uint8_t asteroid_bitmap_3[] = {
+__code const uint8_t asteroid_bitmap_3[] = {
     0b01110000,
     0b11111000,
     0b11111100,
@@ -258,15 +258,15 @@ __code uint8_t asteroid_bitmap_3[] = {
 };
 
 typedef struct {
-    int8_t          w;
-    int8_t          h;
-    uint8_t         hp;
-    uint8_t         score;
-    __code uint8_t* bitmap;
+    int8_t                w;
+    int8_t                h;
+    uint8_t               hp;
+    uint8_t               score;
+    __code const uint8_t* bitmap;
 } asteroid_type_t;
 
 // these are constant, but stored in RAM for fast access
-__idata asteroid_type_t asteroid_types[] = {
+__idata const asteroid_type_t asteroid_types[] = {
     {
         .w      = 2,
         .h      = 2,
@@ -298,7 +298,7 @@ __idata asteroid_type_t asteroid_types[] = {
 };
 
 typedef struct {
-    __idata asteroid_type_t* type;
+    __idata const asteroid_type_t* type;
 
     // coordinates stored as fixed point. 6 bits integer, 2 bits fractional
     int8_t x;
@@ -340,7 +340,7 @@ uint8_t asteroid_get_color(__idata asteroid_t* asteroid) {
  * @return true if any pixels have been rendered
  */
 bool asteroid_render(__idata asteroid_t* asteroid, uint8_t color) __using(2) {
-    __idata asteroid_type_t* type = asteroid->type;
+    __idata const asteroid_type_t* type = asteroid->type;
 
     // convert fixed point values to just integer parts
     int8_t x = Q6_2_TO_INT(asteroid->x);
@@ -496,9 +496,9 @@ bool spaceship_hit(__idata asteroid_t* asteroid) {
         return false;
     }
 
-    __idata asteroid_type_t* type = asteroid->type;
+    __idata const asteroid_type_t* type = asteroid->type;
 
-    if (INTERSECT_AREA(spaceship.x, spaceship.y, 2, 3, asteroid->x >> 2, asteroid->y >> 2, type->w, type->h)) {
+    if (INTERSECT_AREAS(spaceship.x, spaceship.y, 2, 3, Q6_2_TO_INT(asteroid->x), Q6_2_TO_INT(asteroid->y), type->w, type->h)) {
         if (spaceship.hp <= 1) {
             state = GAME_STATE_DRAW_GAMEOVER;
         }
@@ -554,7 +554,7 @@ bool spaceship_update() {
         spaceship.x -= 1;
     }
 
-    // asteroids are rendered before spaceship, so we can check pixels to detect collision
+    // collision detection relies on asteroids already being rendered into framebuffer
     bool hit = framebuffer[spaceship.y][spaceship.x] != BLK ||
                framebuffer[spaceship.y][spaceship.x + 1] != BLK ||
                framebuffer[spaceship.y - 1][spaceship.x] != BLK ||
@@ -604,9 +604,9 @@ void laser_spawn() {
 bool laser_hit(__idata asteroid_t* asteroid, __idata laser_t* laser) {
     if (!asteroid->visible) return false;
 
-    __idata asteroid_type_t* type = asteroid->type;
+    __idata const asteroid_type_t* type = asteroid->type;
 
-    if (INTERSECT_POINT(Q6_2_TO_INT(asteroid->x), Q6_2_TO_INT(asteroid->y), type->w, type->h, laser->x, laser->y)) {
+    if (POINT_IN_AREA(Q6_2_TO_INT(asteroid->x), Q6_2_TO_INT(asteroid->y), type->w, type->h, laser->x, laser->y)) {
         asteroid->hp--;
 
         if (asteroid->hp == 0) {
@@ -635,7 +635,7 @@ void laser_update(__idata laser_t* laser) {
         return;
     }
 
-    // check for collision with asteroid based on pixels
+    // collision detection relies on asteroids already being rendered into framebuffer
     if (framebuffer[laser->y][laser->x] != BLK) {
         // we know we hit something, but we need to find the exact asteroid we hit
         __idata asteroid_t* asteroid_ptr = asteroids;
@@ -721,13 +721,13 @@ uint8_t read_controller() {
 void clear_screen() {
     __xdata uint8_t* f_ptr = framebuffer;
 
-    uint8_t x = WIDTH;
+    uint8_t y = HEIGHT;
     do {
-        uint8_t y = HEIGHT;
+        uint8_t x = WIDTH;
         do {
             *f_ptr++ = BLK;
-        } while (--y > 0);  // djnz loop
-    } while (--x > 0);  // djnz loop
+        } while (--x > 0);  // djnz loop
+    } while (--y > 0);  // djnz loop
 }
 
 void main() {
@@ -959,11 +959,14 @@ void timer0() __interrupt(TF0_VECTOR) __using(1) {
     line++;
     if (line >= 8) line = 0;
 
+    // increment tick every 4 scanlines for 10 ms per tick
     if (line == 0 || line == 3) tick++;
 }
 
 void timer1() __interrupt(TF1_VECTOR) __using(0) {
+    // unused
 }
 
 void timer2() __interrupt(TF2_VECTOR) __using(0) {
+    // unused
 }
